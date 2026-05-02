@@ -2,7 +2,7 @@
 // Caches the app shell so it installs as a PWA and loads instantly.
 // Network-first for the API, cache-first for static assets.
 
-const CACHE = 'jakes-rd-v1';
+const CACHE = 'jakes-rd-v3';
 const SHELL = [
   './',
   './index.html',
