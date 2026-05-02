@@ -116,6 +116,38 @@ window.api = {
     }
     return call('listNotes', { linkedType, linkedId });
   },
+  async getReports() {
+    if (API_CONFIG.USE_MOCK) {
+      // Mock reports — synthesize from MOCK_RUNS if any exist.
+      const runs = window.MOCK_RUNS || [];
+      const closed = runs.filter(r => ['Success','Partial','Failed','Closed'].includes(r['Status']));
+      const speciesNameById = {};
+      (window.MOCK_SPECIES || []).forEach(s => { speciesNameById[s['Species ID']] = s['Common Name']; });
+      const groupBy = (rows, keyFn) => {
+        const map = {};
+        rows.forEach(r => {
+          const k = keyFn(r) || '(unspecified)';
+          if (!map[k]) map[k] = { key: k, total: 0, started: 0, surviving: 0, success: 0 };
+          map[k].total += 1;
+          map[k].started += Number(r['Quantity Started']) || 0;
+          map[k].surviving += Number(r['Quantity Surviving']) || 0;
+          if (r['Status'] === 'Success') map[k].success += 1;
+        });
+        return Object.values(map).map(g => Object.assign(g, {
+          strikeRate: g.started > 0 ? Math.round((g.surviving / g.started) * 100) : null,
+          successRate: g.total > 0 ? Math.round((g.success / g.total) * 100) : 0,
+        })).sort((a, b) => b.total - a.total);
+      };
+      return {
+        byMethod: groupBy(closed, r => r['Propagation Method']),
+        bySpecies: groupBy(closed, r => speciesNameById[r['Species ID']]),
+        bySeason: groupBy(closed, r => r['Season / Year']),
+        needsAttention: [],
+        totals: { species: (window.MOCK_SPECIES || []).length, runs: runs.length, closedRuns: closed.length },
+      };
+    }
+    return call('getReports');
+  },
   async addNote(linkedType, linkedId, text) {
     if (API_CONFIG.USE_MOCK) {
       const key = linkedType + ':' + linkedId;

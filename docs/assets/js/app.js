@@ -69,7 +69,7 @@ function render() {
   if      (name === 'grid')          Screens.grid(screen);
   else if (name === 'species')       Screens.speciesDetail(screen, params.speciesId);
   else if (name === 'run')           Screens.runDetail(screen, params.runId);
-  else if (name === 'reports')       Screens.placeholder(screen, 'Stats', 'Strike rates and reports — coming next.');
+  else if (name === 'reports')       Screens.reports(screen);
   else if (name === 'settings')      Screens.settings(screen);
 }
 
@@ -199,6 +199,13 @@ const Screens = {
   async settings(root) {
     State.config = await api.getConfig();
     renderSettings(root);
+  },
+
+  async reports(root) {
+    if (!State.config) State.config = await api.getConfig();
+    const reports = await api.getReports();
+    if (!State.species.length) State.species = await api.listSpecies();
+    renderReports(root, reports);
   },
 
   async runDetail(root, runId) {
@@ -673,6 +680,101 @@ const CONFIG_CATEGORIES = [
   { key: 'Light Exposure', label: 'Light Exposure', hint: 'Full Sun, Part Shade, Indoor…' },
   { key: 'Rainfall', label: 'Rainfall', hint: 'None, Light, Heavy…' },
 ];
+
+// ─── Reports screen ─────────────────────────────────────────────────
+function renderReports(root, reports) {
+  root.innerHTML = '';
+
+  root.appendChild(el('div', { class: 'settings-intro' },
+    el('h2', { class: 'settings-title' }, 'Stats'),
+    el('p', { class: 'settings-blurb' },
+      'Strike rates roll up only from runs marked Success, Partial, Failed or Closed. Open runs (still in progress) are tracked in “Needs attention”.')
+  ));
+
+  // Totals strip
+  root.appendChild(el('div', { class: 'stat-strip' },
+    statTile(reports.totals.species, 'Species', 'sun'),
+    statTile(reports.totals.runs, 'Total runs', 'cool'),
+    statTile(reports.totals.closedRuns, 'Closed runs', 'alt'),
+  ));
+
+  // Needs attention
+  if (reports.needsAttention && reports.needsAttention.length) {
+    const section = el('section', { class: 'config-section attention-section' });
+    section.appendChild(el('div', { class: 'config-section-head' },
+      el('h3', { html: `Needs attention <span class="count-pill">${reports.needsAttention.length}</span>` }),
+      el('p', { class: 'config-hint' }, 'Open runs that haven’t been touched in 30+ days. Tap to open.'),
+    ));
+    const list = el('div', { class: 'attention-list' });
+    reports.needsAttention.forEach(r => {
+      list.appendChild(el('button', {
+        class: 'attention-row',
+        onclick: () => Router.go('run', { runId: r['Run ID'] }),
+      },
+        el('div', { class: 'run-id' }, r['Run ID']),
+        el('div', { class: 'attention-name' }, r.speciesName || '(unknown species)'),
+        el('div', { class: 'run-meta' },
+          r['Propagation Method'] ? el('span', { class: 'tag' }, r['Propagation Method']) : null,
+          r['Phase'] ? el('span', { class: 'tag' }, r['Phase']) : null,
+          r['Status'] ? el('span', { class: 'tag status-' + slug(r['Status']) }, r['Status']) : null,
+        ),
+      ));
+    });
+    section.appendChild(list);
+    root.appendChild(section);
+  }
+
+  // Strike-rate sections
+  root.appendChild(strikeSection('Strike rate by method',  reports.byMethod,  'Best methods get the longest bars.'));
+  root.appendChild(strikeSection('Top species',            reports.bySpecies, 'Species with the most closed runs first.'));
+  root.appendChild(strikeSection('By season',              reports.bySeason,  'Seasonal patterns across all closed runs.'));
+}
+
+function statTile(value, label, cls) {
+  return el('div', { class: 'stat-tile ' + (cls || '') },
+    el('div', { class: 'stat-value' }, String(value || 0)),
+    el('div', { class: 'stat-label' }, label),
+  );
+}
+
+function strikeSection(title, rows, hint) {
+  const section = el('section', { class: 'config-section' });
+  section.appendChild(el('div', { class: 'config-section-head' },
+    el('h3', {}, title),
+    hint ? el('p', { class: 'config-hint' }, hint) : null,
+  ));
+  if (!rows || rows.length === 0) {
+    section.appendChild(el('p', { class: 'config-empty' }, 'Not enough closed runs yet — log some outcomes and they’ll show up here.'));
+    return section;
+  }
+  const list = el('div', { class: 'bar-list' });
+  rows.slice(0, 10).forEach(r => {
+    const sr = (r.strikeRate == null) ? null : r.strikeRate;
+    const display = sr == null ? '—' : `${sr}%`;
+    const widthPct = sr == null ? 0 : Math.max(2, Math.min(100, sr));
+    list.appendChild(el('div', { class: 'bar-row' },
+      el('div', { class: 'bar-row-head' },
+        el('span', { class: 'bar-label' }, r.key),
+        el('span', { class: 'bar-value' }, display),
+      ),
+      el('div', { class: 'bar-track' },
+        el('div', { class: 'bar-fill ' + strikeColor(sr), style: `width:${widthPct}%` }),
+      ),
+      el('div', { class: 'bar-meta' },
+        `${r.total} run${r.total === 1 ? '' : 's'} · ${r.surviving}/${r.started} survived`,
+      ),
+    ));
+  });
+  section.appendChild(list);
+  return section;
+}
+
+function strikeColor(sr) {
+  if (sr == null) return 'sr-none';
+  if (sr >= 70) return 'sr-high';
+  if (sr >= 40) return 'sr-mid';
+  return 'sr-low';
+}
 
 function makeRemovableChip(v, cat) {
   const chip = el('span', { class: 'config-chip' });
