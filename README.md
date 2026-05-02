@@ -8,7 +8,7 @@ Plantprop/
 │   ├── 01_Bootstrap.gs   creates the sheet structure + seeds Config
 │   ├── 02_Code.gs        CRUD for Species, Runs, Notes, Reports
 │   └── 03_Api.gs         JSON API wrapper exposed as a Web App
-└── web/              # Frontend — deployed via GitHub Pages
+└── docs/              # Frontend — deployed via GitHub Pages
     ├── index.html
     ├── manifest.webmanifest
     ├── sw.js               service worker (PWA install + offline)
@@ -33,11 +33,11 @@ Plantprop/
    - **Execute as: Me** (so it can read/write your Sheet)
    - **Who has access: Anyone** (the URL is public — keep it private)
 4. Click **Deploy**. Copy the **/exec** URL.
-5. *(Optional)* In `apps-script/03_Api.gs`, set `API_TOKEN` to a long random string and re-deploy. Then set the same value in `web/assets/js/config.js`.
+5. *(Optional)* In `apps-script/03_Api.gs`, set `API_TOKEN` to a long random string and re-deploy. Then set the same value in `docs/assets/js/config.js`.
 
 ### 3. Wire the frontend to the API
 
-Edit `web/assets/js/config.js`:
+Edit `docs/assets/js/config.js`:
 
 ```js
 window.API_CONFIG = {
@@ -64,7 +64,7 @@ cd web && python3 -m http.server 8765
    ```
 3. On GitHub: **Settings → Pages**.
    - Source: **Deploy from a branch**
-   - Branch: `main`, folder: `/web`
+   - Branch: `main`, folder: `/docs`
    - Save. After ~1 min the site is live at `https://YOUR_USERNAME.github.io/YOUR_REPO/`.
 
 ### 5. Install as an app on Jake's phone
@@ -77,7 +77,7 @@ Once installed, the app behaves like a native app — full screen, no browser ba
 
 ## Updating
 
-- **Frontend changes:** push to `main`. GitHub Pages redeploys automatically. The service worker version (`CACHE` in `web/sw.js`) needs bumping if you want users to pull updates immediately.
+- **Frontend changes:** push to `main`. GitHub Pages redeploys automatically. The service worker version (`CACHE` in `docs/sw.js`) needs bumping if you want users to pull updates immediately.
 - **Backend changes:** in Apps Script editor, **Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy**. The `/exec` URL stays the same.
 
 ## Backups
