@@ -1,8 +1,9 @@
 // Jake's R&D Plant Journal — service worker
-// Caches the app shell so it installs as a PWA and loads instantly.
-// Network-first for the API, cache-first for static assets.
+// NETWORK-FIRST for everything. Always fetches the latest from the network
+// when online; only falls back to cache when truly offline. This avoids
+// the classic "PWA is stuck on old code" problem during active development.
 
-const CACHE = 'jakes-rd-v3';
+const CACHE = 'jakes-rd-v4';
 const SHELL = [
   './',
   './index.html',
@@ -19,7 +20,9 @@ const SHELL = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL).catch(() => {}))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -34,22 +37,24 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Don't try to cache the Apps Script API — always go to network.
-  if (url.hostname.endsWith('script.google.com')) return;
-  // Skip non-GET (POST to API etc.)
+  // Don't intercept the Apps Script API at all.
+  if (url.hostname.endsWith('script.google.com') ||
+      url.hostname.endsWith('googleusercontent.com')) return;
+
+  // Skip non-GET (POST to API etc.) — let the browser handle.
   if (e.request.method !== 'GET') return;
 
+  // Network-first: try fresh, update cache, fall back to cache only when
+  // the network errors out (typically offline).
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request).then((res) => {
-        // Cache same-origin successful responses for next time.
+    fetch(e.request)
+      .then((res) => {
         if (res.ok && url.origin === location.origin) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(e.request, copy));
         }
         return res;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(e.request))
   );
 });
