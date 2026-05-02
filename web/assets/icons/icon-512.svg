@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1c5e2a"/>
+  <g fill="#f5b840" stroke="#161a14" stroke-width="14" stroke-linejoin="round">
+    <circle cx="256" cy="190" r="118"/>
+    <circle cx="166" cy="226" r="78"/>
+    <circle cx="346" cy="226" r="78"/>
+  </g>
+  <rect x="232" y="276" width="48" height="148" rx="8" fill="#5b4a36" stroke="#161a14" stroke-width="14"/>
+  <rect x="184" y="404" width="144" height="32" rx="10" fill="#161a14"/>
+  <text x="256" y="475" text-anchor="middle" fill="#f7f4ec"
+    font-family="Fredoka, system-ui, sans-serif" font-weight="700" font-size="40" letter-spacing="2">JAKE'S R&amp;D</text>
+</svg>

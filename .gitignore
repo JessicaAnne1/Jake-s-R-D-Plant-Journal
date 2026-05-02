@@ -1,0 +1,9 @@
+.DS_Store
+*.log
+node_modules/
+.vscode/
+.idea/
+
+# Local config containing the deployed API URL — keep it out of git.
+# Comment this out if you want to commit the URL (it's already public).
+web/assets/js/config.local.js
