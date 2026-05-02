@@ -674,6 +674,57 @@ const CONFIG_CATEGORIES = [
   { key: 'Rainfall', label: 'Rainfall', hint: 'None, Light, Heavy…' },
 ];
 
+function makeRemovableChip(v, cat) {
+  const chip = el('span', { class: 'config-chip' });
+  const removeBtn = el('button', { class: 'chip-remove', 'aria-label': 'Remove ' + v, type: 'button' }, '×');
+  const valueSpan = el('span', { class: 'chip-value' }, v);
+  let armed = false;
+  let timer = null;
+
+  const disarm = () => {
+    armed = false;
+    chip.classList.remove('armed');
+    removeBtn.textContent = '×';
+    if (timer) { clearTimeout(timer); timer = null; }
+  };
+
+  removeBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!armed) {
+      // First tap — arm it. Disarm any other armed chip first.
+      $$('.config-chip.armed').forEach((c) => {
+        c.classList.remove('armed');
+        const b = c.querySelector('.chip-remove');
+        if (b) b.textContent = '×';
+      });
+      armed = true;
+      chip.classList.add('armed');
+      removeBtn.textContent = 'DELETE?';
+      timer = setTimeout(disarm, 4000);
+      return;
+    }
+    // Second tap — confirm removal.
+    if (timer) { clearTimeout(timer); timer = null; }
+    try {
+      State.config = await api.removeConfigValue(cat.key, v);
+      renderSettings($('#screen'));
+      toast(`Removed "${v}"`);
+    } catch (err) {
+      disarm();
+      toast('Error: ' + err.message);
+    }
+  });
+
+  // Tap the chip body (not the button) to disarm it.
+  chip.addEventListener('click', (e) => {
+    if (e.target.closest('.chip-remove')) return;
+    if (armed) disarm();
+  });
+
+  chip.append(valueSpan, removeBtn);
+  return chip;
+}
+
 function renderSettings(root) {
   root.innerHTML = '';
 
@@ -702,21 +753,7 @@ function renderConfigSection(cat) {
     chips.appendChild(el('span', { class: 'config-empty' }, 'Nothing here yet — add one below.'));
   } else {
     values.forEach(v => {
-      chips.appendChild(el('span', { class: 'config-chip' },
-        el('span', {}, v),
-        el('button', {
-          class: 'chip-remove',
-          'aria-label': 'Remove ' + v,
-          onclick: async () => {
-            if (!confirm(`Remove "${v}" from ${cat.label}?\n\nExisting records that already use this value will keep it — but it won't appear in dropdowns anymore.`)) return;
-            try {
-              State.config = await api.removeConfigValue(cat.key, v);
-              renderSettings($('#screen'));
-              toast(`Removed "${v}"`);
-            } catch (err) { toast('Error: ' + err.message); }
-          }
-        }, '×')
-      ));
+      chips.appendChild(makeRemovableChip(v, cat));
     });
   }
   section.appendChild(chips);

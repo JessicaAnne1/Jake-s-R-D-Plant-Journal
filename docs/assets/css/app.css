@@ -1003,8 +1003,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--ink);
   color: var(--bg);
   border: none;
-  width: 22px; height: 22px;
-  border-radius: 50%;
+  min-width: 22px; height: 22px;
+  border-radius: 11px;
   font-family: var(--display);
   font-weight: 700;
   font-size: 14px;
@@ -1012,12 +1012,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 0 8px;
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.1s, background 0.15s;
 }
 .chip-remove:hover { background: var(--terra); }
-.chip-remove:active { transform: scale(0.85); }
+.chip-remove:active { transform: scale(0.92); }
+
+.config-chip.armed {
+  background: var(--terra);
+  color: #fff;
+  border-color: var(--ink);
+  animation: pulseArm 0.6s ease-in-out infinite alternate;
+}
+.config-chip.armed .chip-value { color: #fff; }
+.config-chip.armed .chip-remove {
+  background: #fff;
+  color: var(--terra);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 0 10px;
+  height: 22px;
+  border-radius: 11px;
+}
+.config-chip.armed .chip-remove:hover { background: #fff; color: var(--ink); }
+@keyframes pulseArm {
+  from { box-shadow: 0 2px 0 var(--ink); }
+  to   { box-shadow: 0 2px 0 var(--ink), 0 0 0 4px rgba(229, 115, 58, 0.25); }
+}
 .config-add {
   display: flex;
   gap: 8px;
