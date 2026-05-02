@@ -66,6 +66,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-y: none;
+  overflow-x: hidden;
   min-height: 100dvh;
 }
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -152,8 +153,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ─── Screen ─────────────────────────────────────────────────────────── */
 .screen {
   flex: 1;
-  padding: 14px;
+  padding-top: 16px;
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
   padding-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 28px);
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
   max-width: 1280px;
   margin: 0 auto;
   width: 100%;
@@ -170,8 +173,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   top: calc(var(--topbar-h) + var(--safe-top));
   z-index: 40;
   background: var(--bg);
-  margin: -14px -14px 12px;
-  padding: 12px 14px 8px;
+  margin: -16px -18px 12px;
+  padding: 12px 18px 8px;
   border-bottom: 2px solid var(--ink);
   box-shadow: 0 3px 0 var(--ink);
 }
@@ -208,8 +211,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  margin: 0 -14px;
-  padding: 4px 14px 4px;
+  margin: 0 -18px;
+  padding: 4px 18px 4px;
   scrollbar-width: none;
 }
 .chip-row::-webkit-scrollbar { display: none; }
