@@ -70,7 +70,7 @@ function render() {
   else if (name === 'species')       Screens.speciesDetail(screen, params.speciesId);
   else if (name === 'run')           Screens.runDetail(screen, params.runId);
   else if (name === 'reports')       Screens.placeholder(screen, 'Stats', 'Strike rates and reports — coming next.');
-  else if (name === 'settings')      Screens.placeholder(screen, 'Settings', 'Manage your dropdown lists — coming next.');
+  else if (name === 'settings')      Screens.settings(screen);
 }
 
 document.addEventListener('click', (e) => {
@@ -194,6 +194,11 @@ const Screens = {
     ]);
     if (!species) { Screens.placeholder(root, 'Not found', 'Species not found.'); return; }
     renderSpeciesDetail(root, species, runs, notes);
+  },
+
+  async settings(root) {
+    State.config = await api.getConfig();
+    renderSettings(root);
   },
 
   async runDetail(root, runId) {
@@ -591,10 +596,41 @@ function openAddRunModal(speciesId) {
 }
 
 function selectFromConfig(name, configKey) {
-  return el('select', { name },
+  const ADD_NEW = '__add_new__';
+  const select = el('select', { name },
     el('option', { value: '' }, '—'),
-    ...(State.config[configKey] || []).map(c => el('option', { value: c }, c))
+    ...(State.config[configKey] || []).map(c => el('option', { value: c }, c)),
+    el('option', { value: ADD_NEW, class: 'add-new-opt' }, '＋ Add new…')
   );
+  let lastValue = '';
+  select.addEventListener('change', async (e) => {
+    if (e.target.value !== ADD_NEW) { lastValue = e.target.value; return; }
+    const fresh = (prompt(`Add a new ${configKey.replace(/s$/, '').toLowerCase()}:`) || '').trim();
+    if (!fresh) { e.target.value = lastValue; return; }
+    if ((State.config[configKey] || []).includes(fresh)) {
+      e.target.value = fresh;
+      lastValue = fresh;
+      return;
+    }
+    try {
+      State.config = await api.addConfigValue(configKey, fresh);
+      // Rebuild this select's options to include the new value
+      const current = lastValue;
+      while (select.options.length) select.remove(0);
+      [
+        el('option', { value: '' }, '—'),
+        ...(State.config[configKey] || []).map(c => el('option', { value: c }, c)),
+        el('option', { value: ADD_NEW, class: 'add-new-opt' }, '＋ Add new…')
+      ].forEach(o => select.add(o));
+      select.value = fresh;
+      lastValue = fresh;
+      toast(`Added "${fresh}" — saved to ${configKey}`);
+    } catch (err) {
+      toast('Error: ' + err.message);
+      e.target.value = lastValue;
+    }
+  });
+  return select;
 }
 
 // ─── Modal helper ─────────────────────────────────────────────────
@@ -624,6 +660,86 @@ function openModal(title, body, onSave) {
 
 function field(label, input) {
   return el('div', { class: 'field' }, el('label', {}, label), input);
+}
+
+// ─── Settings screen ─────────────────────────────────────────────
+const CONFIG_CATEGORIES = [
+  { key: 'Species Categories', label: 'Species Categories', hint: 'Tree, Shrub, Herb, Fern… (these drive the per-category icons + colours)' },
+  { key: 'Propagation Methods', label: 'Propagation Methods', hint: 'Seed, Cutting, Division, Layering, Grafting…' },
+  { key: 'Phases', label: 'Phases', hint: 'Sourcing, Sown, Rooting, Hardening Off…' },
+  { key: 'Statuses', label: 'Statuses', hint: 'In progress, Success, Failed, Closed…' },
+  { key: 'Mediums', label: 'Mediums', hint: 'Perlite, Coir, Seed-raising mix…' },
+  { key: 'Container Types', label: 'Container Types', hint: 'Tray, Tube, Pot, Propagator…' },
+  { key: 'Light Exposure', label: 'Light Exposure', hint: 'Full Sun, Part Shade, Indoor…' },
+  { key: 'Rainfall', label: 'Rainfall', hint: 'None, Light, Heavy…' },
+];
+
+function renderSettings(root) {
+  root.innerHTML = '';
+
+  root.appendChild(el('div', { class: 'settings-intro' },
+    el('h2', { class: 'settings-title' }, 'Dropdown Lists'),
+    el('p', { class: 'settings-blurb' },
+      'These are the values that appear in every dropdown across the app. Add new ones, remove old ones — changes apply everywhere immediately.')
+  ));
+
+  CONFIG_CATEGORIES.forEach(cat => {
+    root.appendChild(renderConfigSection(cat));
+  });
+}
+
+function renderConfigSection(cat) {
+  const values = State.config[cat.key] || [];
+  const section = el('section', { class: 'config-section' });
+
+  section.appendChild(el('div', { class: 'config-section-head' },
+    el('h3', {}, cat.label),
+    el('p', { class: 'config-hint' }, cat.hint),
+  ));
+
+  const chips = el('div', { class: 'config-chips' });
+  if (values.length === 0) {
+    chips.appendChild(el('span', { class: 'config-empty' }, 'Nothing here yet — add one below.'));
+  } else {
+    values.forEach(v => {
+      chips.appendChild(el('span', { class: 'config-chip' },
+        el('span', {}, v),
+        el('button', {
+          class: 'chip-remove',
+          'aria-label': 'Remove ' + v,
+          onclick: async () => {
+            if (!confirm(`Remove "${v}" from ${cat.label}?\n\nExisting records that already use this value will keep it — but it won't appear in dropdowns anymore.`)) return;
+            try {
+              State.config = await api.removeConfigValue(cat.key, v);
+              renderSettings($('#screen'));
+              toast(`Removed "${v}"`);
+            } catch (err) { toast('Error: ' + err.message); }
+          }
+        }, '×')
+      ));
+    });
+  }
+  section.appendChild(chips);
+
+  const addInput = el('input', {
+    type: 'text',
+    placeholder: `Add new ${cat.label.toLowerCase().replace(/s$/, '')}…`,
+    autocomplete: 'off',
+    onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); } }
+  });
+  const addBtn = el('button', { class: 'btn-primary', onclick: async () => {
+    const v = addInput.value.trim();
+    if (!v) return;
+    if ((State.config[cat.key] || []).includes(v)) { toast('Already in the list'); return; }
+    try {
+      State.config = await api.addConfigValue(cat.key, v);
+      renderSettings($('#screen'));
+      toast(`Added "${v}"`);
+    } catch (err) { toast('Error: ' + err.message); }
+  }}, 'Add');
+
+  section.appendChild(el('div', { class: 'config-add' }, addInput, addBtn));
+  return section;
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────

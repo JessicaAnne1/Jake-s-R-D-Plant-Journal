@@ -7,6 +7,21 @@ window.api = {
     if (API_CONFIG.USE_MOCK) return clone(window.MOCK_CONFIG);
     return call('getConfig');
   },
+  async addConfigValue(category, value) {
+    if (API_CONFIG.USE_MOCK) {
+      window.MOCK_CONFIG[category] = window.MOCK_CONFIG[category] || [];
+      if (!window.MOCK_CONFIG[category].includes(value)) window.MOCK_CONFIG[category].push(value);
+      return clone(window.MOCK_CONFIG);
+    }
+    return call('addConfigValue', { category, value });
+  },
+  async removeConfigValue(category, value) {
+    if (API_CONFIG.USE_MOCK) {
+      window.MOCK_CONFIG[category] = (window.MOCK_CONFIG[category] || []).filter(v => v !== value);
+      return clone(window.MOCK_CONFIG);
+    }
+    return call('removeConfigValue', { category, value });
+  },
   async listSpecies() {
     if (API_CONFIG.USE_MOCK) {
       return clone(window.MOCK_SPECIES).sort(byCreatedDesc);

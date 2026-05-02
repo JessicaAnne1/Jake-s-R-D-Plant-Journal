@@ -908,6 +908,115 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 @keyframes toastIn { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* ─── Settings screen ────────────────────────────────────────────────── */
+.settings-intro { margin-bottom: 18px; }
+.settings-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  margin: 0 0 6px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.settings-blurb {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+  line-height: 1.45;
+}
+.config-section {
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.config-section-head { margin-bottom: 10px; }
+.config-section-head h3 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 17px;
+  margin: 0 0 2px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.config-hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0;
+  line-height: 1.4;
+}
+.config-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+  min-height: 30px;
+}
+.config-empty {
+  font-family: var(--sans);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-faint);
+  padding: 6px 0;
+}
+.config-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--moss-pale);
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  padding: 4px 4px 4px 12px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+}
+.chip-remove {
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.chip-remove:hover { background: var(--terra); }
+.chip-remove:active { transform: scale(0.85); }
+.config-add {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.config-add input {
+  flex: 1;
+  padding: 9px 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  background: var(--bg);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  color: var(--ink);
+  -webkit-appearance: none;
+  font-weight: 500;
+}
+.config-add input:focus { outline: none; }
+.config-add .btn-primary {
+  padding: 9px 18px;
+  flex-shrink: 0;
+}
+
 /* ─── Loading ────────────────────────────────────────────────────────── */
 .loading {
   text-align: center;
