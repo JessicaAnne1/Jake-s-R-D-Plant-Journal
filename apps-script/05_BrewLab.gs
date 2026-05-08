@@ -261,6 +261,26 @@ function updateSite(id, data) {
   return updated;
 }
 
+// ─── Delete (hard delete the row) ───────────────────────────────────
+function deleteSite(siteId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BREW_SHEETS.SITES);
+  const rowIdx = findBrewRow_(BREW_SHEETS.SITES, 'Site ID', siteId);
+  if (rowIdx < 0) throw new Error('Site not found: ' + siteId);
+  const apps = readBrewSheet_(BREW_SHEETS.APPLICATIONS).filter(a => a['Site ID'] === siteId).length;
+  const obs  = readBrewSheet_(BREW_SHEETS.OBSERVATIONS).filter(o => o['Site ID'] === siteId).length;
+  sheet.deleteRow(rowIdx);
+  return { deleted: siteId, orphanedApplications: apps, orphanedObservations: obs };
+}
+
+function deleteBrew(brewId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BREW_SHEETS.BREWS);
+  const rowIdx = findBrewRow_(BREW_SHEETS.BREWS, 'Brew ID', brewId);
+  if (rowIdx < 0) throw new Error('Brew not found: ' + brewId);
+  const apps = readBrewSheet_(BREW_SHEETS.APPLICATIONS).filter(a => a['Brew ID'] === brewId).length;
+  sheet.deleteRow(rowIdx);
+  return { deleted: brewId, orphanedApplications: apps };
+}
+
 // ─── Applications ───────────────────────────────────────────────────
 function listApplicationsBySite(siteId) {
   return readBrewSheet_(BREW_SHEETS.APPLICATIONS).filter(a => a['Site ID'] === siteId)

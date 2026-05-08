@@ -45,6 +45,8 @@ const API_ROUTES = {
   getSite:                  (p) => getSite(p.siteId),
   createSite:               (p) => createSite(p),
   updateSite:               (p) => updateSite(p.siteId, p.data),
+  deleteSite:               (p) => deleteSite(p.siteId),
+  deleteBrew:               (p) => deleteBrew(p.brewId),
 
   listApplicationsBySite:   (p) => listApplicationsBySite(p.siteId),
   listApplicationsByBrew:   (p) => listApplicationsByBrew(p.brewId),

@@ -159,6 +159,9 @@ window.api = {
   async createSite(data)                  { return call('createSite', data); },
   async updateSite(siteId, data)          { return call('updateSite', { siteId, data }); },
 
+  async deleteSite(siteId)                { return call('deleteSite', { siteId }); },
+  async deleteBrew(brewId)                { return call('deleteBrew', { brewId }); },
+
   async listApplicationsBySite(siteId)    { return call('listApplicationsBySite', { siteId }); },
   async listApplicationsByBrew(brewId)    { return call('listApplicationsByBrew', { brewId }); },
   async createApplication(data)           { return call('createApplication', data); },

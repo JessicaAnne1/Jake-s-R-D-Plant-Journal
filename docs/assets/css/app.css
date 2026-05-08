@@ -1182,11 +1182,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 
-/* Hero edit button (floats top-right of any detail hero) */
+/* Hero action buttons (float top-right of any detail hero) */
 .detail-hero { position: relative; }
-.hero-edit {
+.hero-actions {
   position: absolute;
-  top: 12px; right: 12px;
+  top: 10px; right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+.hero-edit, .hero-delete {
   background: rgba(255,255,255,0.95);
   color: var(--ink);
   border: 2px solid var(--ink);
@@ -1199,10 +1204,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   text-transform: uppercase;
   box-shadow: 0 2px 0 var(--ink);
   cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.1s;
+  transition: transform 0.1s, box-shadow 0.1s, background 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.hero-edit:active { transform: translateY(2px); box-shadow: 0 0 0 var(--ink); }
+.hero-edit:active, .hero-delete:active { transform: translateY(2px); box-shadow: 0 0 0 var(--ink); }
+.hero-delete.armed {
+  background: var(--terra);
+  color: #fff;
+  animation: pulseArm 0.6s ease-in-out infinite alternate;
+}
 
 /* ─── Brew Lab — Home dashboard tiles ──────────────────────────────── */
 .home-tiles {

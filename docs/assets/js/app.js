@@ -1217,7 +1217,23 @@ function renderSiteDetail(root, site, applications, observations) {
   const hero = el('div', { class: 'detail-hero ' + (isControl ? 'cat-control' : 'cat-treated') });
   hero.style.setProperty('--tint', isControl ? '#7a5ab0' : '#2d8a3e');
   hero.append(
-    el('button', { class: 'hero-edit', onclick: () => openEditSiteModal(site) }, '✎ Edit'),
+    el('div', { class: 'hero-actions' },
+      el('button', { class: 'hero-edit', onclick: () => openEditSiteModal(site) }, '✎ Edit'),
+      makeArmedDeleteButton({
+        confirmLabel: () => 'DELETE?',
+        warn: () => `Delete ${site['Name'] || 'site'}? Existing applications and observations will become orphaned. Tap again to confirm.`,
+        action: async () => {
+          const result = await api.deleteSite(site['Site ID']);
+          State.sites = State.sites.filter(s => s['Site ID'] !== site['Site ID']);
+          let msg = `Deleted ${site['Name'] || site['Site ID']}`;
+          if (result.orphanedApplications || result.orphanedObservations) {
+            msg += ` — ${result.orphanedApplications + result.orphanedObservations} orphan record(s) left in sheet`;
+          }
+          toast(msg);
+          Router.go('sites', {}, { reset: true });
+        },
+      }),
+    ),
     el('div', { class: 'hero-icon', html: siteIconSvg() }),
     el('h2', {}, site['Name'] || '(unnamed site)'),
     site['Owner / Farm'] ? el('p', { class: 'sci' }, site['Owner / Farm']) : null,
@@ -1399,6 +1415,21 @@ function renderBrewDetail(root, brew, applications) {
   const hero = el('div', { class: 'detail-hero' });
   hero.style.setProperty('--tint', tint);
   hero.append(
+    el('div', { class: 'hero-actions' },
+      makeArmedDeleteButton({
+        warn: () => `Delete brew ${brew['Name'] || brew['Brew ID']}? Existing applications using it will become orphaned. Tap again to confirm.`,
+        action: async () => {
+          const result = await api.deleteBrew(brew['Brew ID']);
+          State.brews = State.brews.filter(b => b['Brew ID'] !== brew['Brew ID']);
+          let msg = `Deleted ${brew['Name'] || brew['Brew ID']}`;
+          if (result.orphanedApplications) {
+            msg += ` — ${result.orphanedApplications} orphan record(s) left in sheet`;
+          }
+          toast(msg);
+          Router.go('brews', {}, { reset: true });
+        },
+      }),
+    ),
     el('div', { class: 'hero-icon', html: brewIconSvg() }),
     el('h2', {}, brew['Name'] || brew['Brew ID']),
     el('p', { class: 'sci' }, brew['Brew ID'] + (brew['Date Brewed'] ? ' · ' + fmtDate(brew['Date Brewed']) : '')),
@@ -1653,6 +1684,37 @@ function openAddSiteModal() {
       Router.go('site', { siteId: created['Site ID'] });
     } catch (err) { toast('Error: ' + err.message); }
   });
+}
+
+// Two-tap delete button. First tap arms it (red, "DELETE?"), second tap confirms.
+// Auto-disarms after 4 seconds.
+function makeArmedDeleteButton({ warn, action, label = '🗑 Delete', confirmLabel = () => 'TAP AGAIN' }) {
+  const btn = el('button', { class: 'hero-delete', type: 'button' }, label);
+  let armed = false;
+  let timer = null;
+  const disarm = () => {
+    armed = false;
+    btn.classList.remove('armed');
+    btn.textContent = label;
+    if (timer) { clearTimeout(timer); timer = null; }
+  };
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!armed) {
+      armed = true;
+      btn.classList.add('armed');
+      btn.textContent = confirmLabel();
+      if (warn) toast(warn());
+      timer = setTimeout(disarm, 4000);
+      return;
+    }
+    if (timer) { clearTimeout(timer); timer = null; }
+    btn.disabled = true;
+    btn.textContent = '…';
+    try { await action(); }
+    catch (err) { toast('Error: ' + err.message); disarm(); btn.disabled = false; }
+  });
+  return btn;
 }
 
 function openEditSiteModal(site) {
