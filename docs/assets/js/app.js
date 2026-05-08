@@ -228,6 +228,8 @@ function render() {
 
   $$('.nav-btn[data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
   $('.back-btn').hidden = (name === currentMode().home && State.history.length === 0);
+  // Hide the bottom nav on edit-style screens that have their own back navigation
+  document.body.classList.toggle('hide-bottom-nav', name === 'siteEdit');
 
   const dispatch = () => {
     // Plant mode

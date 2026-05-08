@@ -1204,6 +1204,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   pointer-events: none;
 }
 
+/* When showing an edit-style screen, suppress the bottom nav so the
+   page can scroll all the way to its own action buttons. */
+body.hide-bottom-nav .bottom-nav { display: none; }
+body.hide-bottom-nav .screen {
+  padding-bottom: calc(var(--safe-bottom) + 24px);
+}
+
 /* Collapsible edit panel (HTML <details>) — keeps apps/obs near the top */
 .edit-panel {
   background: var(--surface);
