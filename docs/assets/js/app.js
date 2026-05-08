@@ -757,14 +757,16 @@ function openAddRunModal(speciesId) {
   });
 }
 
-function selectFromConfig(name, configKey) {
+function selectFromConfig(name, configKey, initialValue) {
   const ADD_NEW = '__add_new__';
   const select = el('select', { name },
     el('option', { value: '' }, '—'),
-    ...(State.config[configKey] || []).map(c => el('option', { value: c }, c)),
+    ...(State.config[configKey] || []).map(c =>
+      el('option', { value: c, selected: c === initialValue ? '' : null }, c)
+    ),
     el('option', { value: ADD_NEW, class: 'add-new-opt' }, '＋ Add new…')
   );
-  let lastValue = '';
+  let lastValue = initialValue || '';
   select.addEventListener('change', async (e) => {
     if (e.target.value !== ADD_NEW) { lastValue = e.target.value; return; }
     const fresh = (prompt(`Add a new ${configKey.replace(/s$/, '').toLowerCase()}:`) || '').trim();
@@ -1215,6 +1217,7 @@ function renderSiteDetail(root, site, applications, observations) {
   const hero = el('div', { class: 'detail-hero ' + (isControl ? 'cat-control' : 'cat-treated') });
   hero.style.setProperty('--tint', isControl ? '#7a5ab0' : '#2d8a3e');
   hero.append(
+    el('button', { class: 'hero-edit', onclick: () => openEditSiteModal(site) }, '✎ Edit'),
     el('div', { class: 'hero-icon', html: siteIconSvg() }),
     el('h2', {}, site['Name'] || '(unnamed site)'),
     site['Owner / Farm'] ? el('p', { class: 'sci' }, site['Owner / Farm']) : null,
@@ -1648,6 +1651,29 @@ function openAddSiteModal() {
       toast(`Added ${created['Name']}`);
       close();
       Router.go('site', { siteId: created['Site ID'] });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+function openEditSiteModal(site) {
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    field('Site name', el('input', { name: 'Name', required: true, value: site['Name'] || '', autocomplete: 'off' })),
+    field('Owner / farm', el('input', { name: 'Owner / Farm', value: site['Owner / Farm'] || '', autocomplete: 'off' })),
+    field('Location', el('input', { name: 'Location', value: site['Location'] || '', autocomplete: 'off' })),
+    field('Crop', selectFromConfig('Crop', 'Crops', site['Crop'])),
+    field('Soil type', selectFromConfig('Soil Type', 'Soil Types', site['Soil Type'])),
+    field('Site type', selectFromConfig('Site Type', 'Site Types', site['Site Type'])),
+    field('Baseline notes', el('textarea', { name: 'Baseline Notes' }, site['Baseline Notes'] || '')),
+  );
+  openModal('Edit site', form, async (close) => {
+    const data = {};
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    if (!data['Name']) { toast('Name required'); return; }
+    try {
+      await api.updateSite(site['Site ID'], data);
+      toast('Saved');
+      close();
+      Router.go('site', { siteId: site['Site ID'] }, { push: false });
     } catch (err) { toast('Error: ' + err.message); }
   });
 }

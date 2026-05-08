@@ -1182,6 +1182,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 
+/* Hero edit button (floats top-right of any detail hero) */
+.detail-hero { position: relative; }
+.hero-edit {
+  position: absolute;
+  top: 12px; right: 12px;
+  background: rgba(255,255,255,0.95);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.hero-edit:active { transform: translateY(2px); box-shadow: 0 0 0 var(--ink); }
+
 /* ─── Brew Lab — Home dashboard tiles ──────────────────────────────── */
 .home-tiles {
   display: grid;

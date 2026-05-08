@@ -82,12 +82,22 @@ function seasonFromDate_(date) {
 }
 
 // ─── Config ─────────────────────────────────────────────────────────────────
+// Reads ACTUAL Config headers from row 1 — this lets new Config columns
+// (e.g. the Brew Lab additions) work without changing the HEADERS map.
+function configHeaders_() {
+  const sheet = getSheet_(SHEETS.CONFIG);
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return [];
+  return sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(v => String(v || '').trim());
+}
+
 function getConfig() {
   const sheet = getSheet_(SHEETS.CONFIG);
-  const headers = HEADERS[SHEETS.CONFIG];
+  const headers = configHeaders_();
   const lastRow = Math.max(sheet.getLastRow(), 1);
   const result = {};
   headers.forEach((header, idx) => {
+    if (!header) return;
     if (lastRow < 2) { result[header] = []; return; }
     const values = sheet.getRange(2, idx + 1, lastRow - 1, 1).getValues().flat()
       .filter(v => v !== '' && v !== null);
@@ -98,7 +108,7 @@ function getConfig() {
 
 function addConfigValue(category, value) {
   const sheet = getSheet_(SHEETS.CONFIG);
-  const headers = HEADERS[SHEETS.CONFIG];
+  const headers = configHeaders_();
   const col = headers.indexOf(category) + 1;
   if (col === 0) throw new Error('Unknown config category: ' + category);
   const lastRow = sheet.getLastRow();
@@ -112,7 +122,7 @@ function addConfigValue(category, value) {
 
 function removeConfigValue(category, value) {
   const sheet = getSheet_(SHEETS.CONFIG);
-  const headers = HEADERS[SHEETS.CONFIG];
+  const headers = configHeaders_();
   const col = headers.indexOf(category) + 1;
   if (col === 0) throw new Error('Unknown config category: ' + category);
   const lastRow = sheet.getLastRow();
