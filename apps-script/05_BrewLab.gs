@@ -290,6 +290,29 @@ function listApplicationsByBrew(brewId) {
   return readBrewSheet_(BREW_SHEETS.APPLICATIONS).filter(a => a['Brew ID'] === brewId)
     .sort((a, b) => new Date(b['Date Applied'] || 0) - new Date(a['Date Applied'] || 0));
 }
+function getApplication(id) {
+  return readBrewSheet_(BREW_SHEETS.APPLICATIONS).find(a => a['Application ID'] === id) || null;
+}
+function updateApplication(id, data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BREW_SHEETS.APPLICATIONS);
+  const headers = BREW_HEADERS[BREW_SHEETS.APPLICATIONS];
+  const rowIdx = findBrewRow_(BREW_SHEETS.APPLICATIONS, 'Application ID', id);
+  if (rowIdx < 0) throw new Error('Application not found: ' + id);
+  const current = {};
+  sheet.getRange(rowIdx, 1, 1, headers.length).getValues()[0].forEach((v, i) => { current[headers[i]] = v; });
+  const updated = Object.assign({}, current, data, { 'Application ID': id });
+  if (data['Date Applied']) updated['Date Applied'] = new Date(data['Date Applied']);
+  sheet.getRange(rowIdx, 1, 1, headers.length).setValues([brewRowToValues_(updated, BREW_SHEETS.APPLICATIONS)]);
+  return updated;
+}
+function deleteApplication(id) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BREW_SHEETS.APPLICATIONS);
+  const rowIdx = findBrewRow_(BREW_SHEETS.APPLICATIONS, 'Application ID', id);
+  if (rowIdx < 0) throw new Error('Application not found: ' + id);
+  sheet.deleteRow(rowIdx);
+  return { deleted: id };
+}
+
 function createApplication(data) {
   const id = nextBrewId_(BREW_SHEETS.APPLICATIONS, 'Application ID', 'AP-');
   const record = Object.assign({}, data, {
@@ -307,6 +330,29 @@ function listObservationsBySite(siteId) {
   return readBrewSheet_(BREW_SHEETS.OBSERVATIONS).filter(o => o['Site ID'] === siteId)
     .sort((a, b) => new Date(b['Date'] || 0) - new Date(a['Date'] || 0));
 }
+function getObservation(id) {
+  return readBrewSheet_(BREW_SHEETS.OBSERVATIONS).find(o => o['Observation ID'] === id) || null;
+}
+function updateObservation(id, data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BREW_SHEETS.OBSERVATIONS);
+  const headers = BREW_HEADERS[BREW_SHEETS.OBSERVATIONS];
+  const rowIdx = findBrewRow_(BREW_SHEETS.OBSERVATIONS, 'Observation ID', id);
+  if (rowIdx < 0) throw new Error('Observation not found: ' + id);
+  const current = {};
+  sheet.getRange(rowIdx, 1, 1, headers.length).getValues()[0].forEach((v, i) => { current[headers[i]] = v; });
+  const updated = Object.assign({}, current, data, { 'Observation ID': id });
+  if (data['Date']) updated['Date'] = new Date(data['Date']);
+  sheet.getRange(rowIdx, 1, 1, headers.length).setValues([brewRowToValues_(updated, BREW_SHEETS.OBSERVATIONS)]);
+  return updated;
+}
+function deleteObservation(id) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BREW_SHEETS.OBSERVATIONS);
+  const rowIdx = findBrewRow_(BREW_SHEETS.OBSERVATIONS, 'Observation ID', id);
+  if (rowIdx < 0) throw new Error('Observation not found: ' + id);
+  sheet.deleteRow(rowIdx);
+  return { deleted: id };
+}
+
 function createObservation(data) {
   const id = nextBrewId_(BREW_SHEETS.OBSERVATIONS, 'Observation ID', 'OB-');
   const record = Object.assign({}, data, {
@@ -329,11 +375,19 @@ function uploadBrewPhoto(payload) {
   const safe = (payload.filename || 'photo.jpg').replace(/[^a-z0-9.\-_]/gi, '_');
   const blob = Utilities.newBlob(bytes, payload.mimeType || 'image/jpeg', `${stamp}-${safe}`);
   const file = subfolder.createFile(blob);
-  // Make link shareable as anyone-with-link viewer.
+  // Make link shareable as anyone-with-link viewer (so img tags work).
   try {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (e) { /* best effort */ }
-  return { url: file.getUrl(), id: file.getId(), name: file.getName() };
+  const id = file.getId();
+  // Drive thumbnail endpoint returns an actual image and works in <img>
+  // tags, unlike the file viewer URL which returns an HTML page.
+  return {
+    url: 'https://drive.google.com/thumbnail?id=' + id + '&sz=w2000',
+    viewUrl: file.getUrl(),
+    id: id,
+    name: file.getName(),
+  };
 }
 
 function getOrCreateBrewPhotoFolder_() {

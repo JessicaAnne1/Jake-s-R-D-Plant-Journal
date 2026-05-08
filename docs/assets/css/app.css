@@ -1388,8 +1388,38 @@ body[data-mode="brew"] .brand-sub { background: var(--terra); color: #fff; }
   border-radius: var(--radius);
   display: block;
   box-shadow: 0 2px 0 var(--ink);
+  background: var(--bg-soft);
 }
-.photo-thumb { display: inline-block; }
+.photo-thumb {
+  position: relative;
+  display: inline-block;
+}
+.photo-remove {
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--terra);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--ink);
+}
+.modal-extra-actions {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  justify-content: flex-start;
+}
 .photo-uploading {
   font-family: var(--display);
   font-size: 12px;

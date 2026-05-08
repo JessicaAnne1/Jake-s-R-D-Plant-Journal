@@ -3,7 +3,7 @@
 // when online; only falls back to cache when truly offline. This avoids
 // the classic "PWA is stuck on old code" problem during active development.
 
-const CACHE = 'jakes-rd-v11';
+const CACHE = 'jakes-rd-v12';
 const SHELL = [
   './',
   './index.html',

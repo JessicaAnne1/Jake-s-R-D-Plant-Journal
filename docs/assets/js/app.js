@@ -21,7 +21,8 @@ function wrapApiMutations() {
     'addNote',
     'createBrew', 'updateBrew', 'deleteBrew',
     'createSite', 'updateSite', 'deleteSite',
-    'createApplication', 'createObservation',
+    'createApplication', 'updateApplication', 'deleteApplication',
+    'createObservation', 'updateObservation', 'deleteObservation',
     'addConfigValue', 'removeConfigValue',
     'uploadBrewPhoto',
   ];
@@ -1353,7 +1354,10 @@ function renderSiteDetail(root, site, applications, observations) {
 }
 
 function applicationCard(a, brew) {
-  return el('div', { class: 'run-card', style: 'cursor:default' },
+  return el('button', {
+    class: 'run-card',
+    onclick: () => openEditApplicationModal(a),
+  },
     el('div', { class: 'run-id' }, a['Application ID']),
     el('h4', { class: 'run-method' }, brew ? brew['Name'] || brew['Brew ID'] : (a['Brew ID'] || '(unknown brew)')),
     el('div', { class: 'run-meta' },
@@ -1367,7 +1371,7 @@ function applicationCard(a, brew) {
 }
 function observationCard(o) {
   const photos = parsePhotoUrls(o['Photo URLs']);
-  return el('div', { class: 'note observation' },
+  return el('div', { class: 'note observation', onclick: () => openEditObservationModal(o), style: 'cursor:pointer' },
     el('div', { class: 'note-date' },
       [fmtDate(o['Date']), o['Days Since Application'] ? `Day ${o['Days Since Application']}` : null]
         .filter(Boolean).join(' · ')),
@@ -1888,6 +1892,158 @@ function openAddApplicationModal(siteId, brewId) {
       else Router.go('site', { siteId: data['Site ID'] });
     } catch (err) { toast('Error: ' + err.message); }
   });
+}
+
+function openEditApplicationModal(app) {
+  const dateVal = app['Date Applied'] ? new Date(app['Date Applied']) : null;
+  const dateStr = dateVal && !isNaN(dateVal) ? dateVal.toISOString().slice(0, 10) : '';
+
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    el('div', { class: 'field' }, el('label', {}, 'Application ID'),
+      el('input', { value: app['Application ID'], disabled: true, style: 'opacity:0.6' })),
+    field('Brew', el('select', { name: 'Brew ID' },
+      el('option', { value: '' }, '—'),
+      ...State.brews.slice().sort((a, b) => (a['Name'] || '').localeCompare(b['Name'] || ''))
+        .map(b => el('option', { value: b['Brew ID'], selected: b['Brew ID'] === app['Brew ID'] ? '' : null },
+          `${b['Name'] || b['Brew ID']}${b['Status'] ? ' · ' + b['Status'] : ''}`))
+    )),
+    field('Method', selectFromConfig('Method', 'Application Methods', app['Method'])),
+    field('Date applied', el('input', { type: 'date', name: 'Date Applied', value: dateStr })),
+    field('Dilution', el('input', { name: 'Dilution', value: app['Dilution'] || '' })),
+    field('Volume applied (L)', el('input', { type: 'number', step: '0.1', name: 'Volume Applied (L)', value: app['Volume Applied (L)'] || '' })),
+    field('Area treated (m²)', el('input', { type: 'number', step: '0.1', name: 'Area Treated (m²)', value: app['Area Treated (m²)'] || '' })),
+    field('Weather', el('input', { name: 'Weather', value: app['Weather'] || '' })),
+    field('Notes', el('textarea', { name: 'Notes' }, app['Notes'] || '')),
+    el('div', { class: 'modal-extra-actions' },
+      makeArmedDeleteButton({
+        warn: () => `Delete ${app['Application ID']}? This cannot be undone.`,
+        action: async () => {
+          await api.deleteApplication(app['Application ID']);
+          toast(`Deleted ${app['Application ID']}`);
+          closeModal();
+          Router.go('site', { siteId: app['Site ID'] }, { push: false });
+        },
+      }),
+    ),
+  );
+
+  openModal('Edit application', form, async (close) => {
+    const data = {};
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    try {
+      await api.updateApplication(app['Application ID'], data);
+      toast('Saved');
+      close();
+      Router.go('site', { siteId: app['Site ID'] }, { push: false });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+function openEditObservationModal(obs) {
+  const dateVal = obs['Date'] ? new Date(obs['Date']) : null;
+  const dateStr = dateVal && !isNaN(dateVal) ? dateVal.toISOString().slice(0, 10) : '';
+
+  // Photos state — start with whatever's already saved
+  const existingUrls = parsePhotoUrls(obs['Photo URLs']);
+  const photoState = { urls: existingUrls.slice() };
+  const photoStrip = el('div', { class: 'photo-strip' });
+  const renderPhotoStrip = () => {
+    photoStrip.innerHTML = '';
+    photoState.urls.forEach((url, idx) => {
+      const wrap = el('div', { class: 'photo-thumb' },
+        el('img', { src: url, alt: 'photo', loading: 'lazy' }),
+        el('button', {
+          type: 'button',
+          class: 'photo-remove',
+          'aria-label': 'Remove photo',
+          onclick: (e) => {
+            e.stopPropagation();
+            photoState.urls.splice(idx, 1);
+            renderPhotoStrip();
+          },
+        }, '×'),
+      );
+      photoStrip.appendChild(wrap);
+    });
+  };
+  renderPhotoStrip();
+
+  const uploadingMsg = el('div', { class: 'photo-uploading', style: 'display:none' }, 'Uploading…');
+  const photoInput = el('input', {
+    type: 'file', accept: 'image/*', capture: 'environment', multiple: true,
+    style: 'display:none',
+    onchange: async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      uploadingMsg.style.display = '';
+      for (const file of files) {
+        try {
+          const resized = await resizeImage(file, 1280);
+          const result = await api.uploadBrewPhoto({
+            filename: file.name,
+            base64: resized.base64,
+            mimeType: 'image/jpeg',
+            siteId: obs['Site ID'],
+          });
+          photoState.urls.push(result.url);
+          renderPhotoStrip();
+        } catch (err) { toast('Photo error: ' + err.message); }
+      }
+      uploadingMsg.style.display = 'none';
+      e.target.value = '';
+    },
+  });
+
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    el('div', { class: 'field' }, el('label', {}, 'Observation ID'),
+      el('input', { value: obs['Observation ID'], disabled: true, style: 'opacity:0.6' })),
+    field('Date', el('input', { type: 'date', name: 'Date', value: dateStr })),
+    field('Days since last application', el('input', { type: 'number', name: 'Days Since Application', value: obs['Days Since Application'] || '' })),
+    field('Plant health 1–10', el('input', { type: 'number', min: '1', max: '10', name: 'Plant Health 1-10', value: obs['Plant Health 1-10'] || '' })),
+    field('Growth notes', el('input', { name: 'Growth', value: obs['Growth'] || '' })),
+    field('Disease incidence', el('input', { name: 'Disease Incidence', value: obs['Disease Incidence'] || '' })),
+    field('Yield', el('input', { name: 'Yield', value: obs['Yield'] || '' })),
+    field('Soil mineral N', el('input', { name: 'Soil Mineral N', value: obs['Soil Mineral N'] || '' })),
+    field('Soil available P', el('input', { name: 'Soil Available P', value: obs['Soil Available P'] || '' })),
+    field('Soil microbial', el('input', { name: 'Soil Microbial', value: obs['Soil Microbial'] || '' })),
+    field('Notes', el('textarea', { name: 'Notes' }, obs['Notes'] || '')),
+    el('div', { class: 'field' },
+      el('label', {}, 'Photos'),
+      el('button', { type: 'button', class: 'btn', onclick: () => photoInput.click() }, '📷 Add more photos'),
+      uploadingMsg,
+      photoStrip,
+      photoInput,
+    ),
+    el('div', { class: 'modal-extra-actions' },
+      makeArmedDeleteButton({
+        warn: () => `Delete ${obs['Observation ID']}? This cannot be undone.`,
+        action: async () => {
+          await api.deleteObservation(obs['Observation ID']);
+          toast(`Deleted ${obs['Observation ID']}`);
+          closeModal();
+          Router.go('site', { siteId: obs['Site ID'] }, { push: false });
+        },
+      }),
+    ),
+  );
+
+  openModal('Edit observation', form, async (close) => {
+    const data = {};
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    data['Photo URLs'] = photoState.urls.join(';');
+    try {
+      await api.updateObservation(obs['Observation ID'], data);
+      toast('Saved');
+      close();
+      Router.go('site', { siteId: obs['Site ID'] }, { push: false });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+function closeModal() {
+  const root = $('#modal-root');
+  root.innerHTML = '';
+  document.body.style.overflow = '';
 }
 
 function openAddObservationModal(siteId) {

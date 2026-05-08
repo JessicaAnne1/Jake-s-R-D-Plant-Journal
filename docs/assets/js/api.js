@@ -177,9 +177,13 @@ window.api = {
   async listApplicationsBySite(siteId)    { return call('listApplicationsBySite', { siteId }); },
   async listApplicationsByBrew(brewId)    { return call('listApplicationsByBrew', { brewId }); },
   async createApplication(data)           { return call('createApplication', data); },
+  async updateApplication(id, data)       { return call('updateApplication', { id, data }); },
+  async deleteApplication(id)             { return call('deleteApplication', { id }); },
 
   async listObservationsBySite(siteId)    { return call('listObservationsBySite', { siteId }); },
   async createObservation(data)           { return call('createObservation', data); },
+  async updateObservation(id, data)       { return call('updateObservation', { id, data }); },
+  async deleteObservation(id)             { return call('deleteObservation', { id }); },
 
   async uploadBrewPhoto(payload)          { return call('uploadBrewPhoto', payload); },
   async getBrewReports()                  { return call('getBrewReports'); },

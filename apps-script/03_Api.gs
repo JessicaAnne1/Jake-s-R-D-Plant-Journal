@@ -63,9 +63,15 @@ const API_ROUTES = {
   listApplicationsBySite:   (p) => listApplicationsBySite(p.siteId),
   listApplicationsByBrew:   (p) => listApplicationsByBrew(p.brewId),
   createApplication:        (p) => createApplication(p),
+  getApplication:           (p) => getApplication(p.id),
+  updateApplication:        (p) => updateApplication(p.id, p.data),
+  deleteApplication:        (p) => deleteApplication(p.id),
 
   listObservationsBySite:   (p) => listObservationsBySite(p.siteId),
   createObservation:        (p) => createObservation(p),
+  getObservation:           (p) => getObservation(p.id),
+  updateObservation:        (p) => updateObservation(p.id, p.data),
+  deleteObservation:        (p) => deleteObservation(p.id),
 
   uploadBrewPhoto:          (p) => uploadBrewPhoto(p),
   getBrewReports:           () => getBrewReports(),
