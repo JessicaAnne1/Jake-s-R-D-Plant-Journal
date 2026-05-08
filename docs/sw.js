@@ -3,7 +3,7 @@
 // when online; only falls back to cache when truly offline. This avoids
 // the classic "PWA is stuck on old code" problem during active development.
 
-const CACHE = 'jakes-rd-v14';
+const CACHE = 'jakes-rd-v15';
 const SHELL = [
   './',
   './index.html',
@@ -44,10 +44,13 @@ self.addEventListener('fetch', (e) => {
   // Skip non-GET (POST to API etc.) — let the browser handle.
   if (e.request.method !== 'GET') return;
 
-  // Network-first: try fresh, update cache, fall back to cache only when
-  // the network errors out (typically offline).
+  // Network-first AND bypass the browser's HTTP cache (cache: 'reload')
+  // for same-origin GETs. Without this, the browser's max-age=600 from
+  // GitHub Pages would serve stale JS/CSS for up to 10 minutes after a
+  // push — undoing the network-first behaviour we want.
+  const fetchOpts = (url.origin === location.origin) ? { cache: 'reload' } : {};
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, fetchOpts)
       .then((res) => {
         if (res.ok && url.origin === location.origin) {
           const copy = res.clone();
