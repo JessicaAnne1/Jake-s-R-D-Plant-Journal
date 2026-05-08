@@ -1182,6 +1182,86 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 
+/* ─── Brew Lab — Home dashboard tiles ──────────────────────────────── */
+.home-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.home-tile {
+  aspect-ratio: 1 / 0.95;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface);
+  box-shadow: 0 4px 0 var(--ink);
+  transition: transform 0.12s cubic-bezier(0.34, 1.6, 0.64, 1), box-shadow 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.home-tile:active { transform: translateY(4px); box-shadow: 0 0 0 var(--ink); }
+@media (hover: hover) {
+  .home-tile:hover { transform: translateY(-2px) rotate(-1deg); box-shadow: 0 6px 0 var(--ink); }
+}
+.home-tile-icon {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.45);
+}
+.home-tile-icon svg { width: 64%; height: 64%; }
+.home-tile-label {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin-top: auto;
+}
+.home-tile-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.75;
+  letter-spacing: 0.04em;
+}
+.home-tile.tile-treated { background: var(--c-herb); color: #fff; }
+.home-tile.tile-treated .home-tile-sub { color: #fff; }
+.home-tile.tile-treated .home-tile-icon { background: rgba(255,255,255,0.25); color: #fff; }
+.home-tile.tile-brew    { background: var(--terra); color: #fff; }
+.home-tile.tile-brew .home-tile-sub { color: #fff; }
+.home-tile.tile-brew .home-tile-icon { background: rgba(255,255,255,0.25); color: #fff; }
+.home-tile.tile-stats   { background: var(--sky); color: #fff; }
+.home-tile.tile-stats .home-tile-sub { color: #fff; }
+.home-tile.tile-stats .home-tile-icon { background: rgba(255,255,255,0.25); color: #fff; }
+.home-tile.tile-setup   { background: var(--sun); color: var(--ink); }
+
+.quick-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.screen-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.sticky-bar-secondary {
+  /* Keep its sticky behaviour but push down a bit since header sits above */
+  top: calc(var(--topbar-h) + var(--safe-top));
+}
+
 /* ─── Brew Lab — additional palette + components ────────────────────── */
 body[data-mode="brew"] .brand-sub { background: var(--terra); color: #fff; }
 

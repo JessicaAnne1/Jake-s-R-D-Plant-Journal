@@ -25,14 +25,13 @@ const MODES = {
   },
   brew: {
     label: 'BREW LAB',
-    home: 'sites',
+    home: 'brewhome',
     accent: 'var(--terra)',
     brandSub: 'BREW LAB',
     fabAction: 'fab-brew',
     nav: [
-      { name: 'sites',        label: 'Sites',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 7v12H3V9z"/><path d="M9 21V13h6v8"/></svg>' },
-      { name: 'brews',        label: 'Brews',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/><path d="M8 13c2 1 4-1 6 0s4-1 6 0"/></svg>' },
-      { name: 'brewstats',    label: 'Stats',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg>' },
+      { name: 'brewhome',  label: 'Home',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v11h14V10"/></svg>' },
+      { name: 'brewstats', label: 'Stats', icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg>' },
     ],
   },
 };
@@ -128,7 +127,7 @@ const Router = {
   back() {
     const prev = State.history.pop();
     if (prev) { State.current = prev; render(); }
-    else      { Router.go('grid', {}, { reset: true }); }
+    else      { Router.go(currentMode().home, {}, { reset: true }); }
   },
 };
 
@@ -140,19 +139,43 @@ function render() {
   $$('.nav-btn[data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
   $('.back-btn').hidden = (name === currentMode().home && State.history.length === 0);
 
-  // Plant mode
-  if      (name === 'grid')          Screens.grid(screen);
-  else if (name === 'species')       Screens.speciesDetail(screen, params.speciesId);
-  else if (name === 'run')           Screens.runDetail(screen, params.runId);
-  else if (name === 'reports')       Screens.reports(screen);
-  // Brew mode
-  else if (name === 'sites')         Screens.sites(screen);
-  else if (name === 'site')          Screens.siteDetail(screen, params.siteId);
-  else if (name === 'brews')         Screens.brews(screen);
-  else if (name === 'brew')          Screens.brewDetail(screen, params.brewId);
-  else if (name === 'brewstats')     Screens.brewStats(screen);
-  // Shared
-  else if (name === 'settings')      Screens.settings(screen);
+  const dispatch = () => {
+    // Plant mode
+    if      (name === 'grid')          return Screens.grid(screen);
+    else if (name === 'species')       return Screens.speciesDetail(screen, params.speciesId);
+    else if (name === 'run')           return Screens.runDetail(screen, params.runId);
+    else if (name === 'reports')       return Screens.reports(screen);
+    // Brew mode
+    else if (name === 'brewhome')      return Screens.brewhome(screen);
+    else if (name === 'sites')         return Screens.sites(screen);
+    else if (name === 'site')          return Screens.siteDetail(screen, params.siteId);
+    else if (name === 'brews')         return Screens.brews(screen);
+    else if (name === 'brew')          return Screens.brewDetail(screen, params.brewId);
+    else if (name === 'brewstats')     return Screens.brewStats(screen);
+    // Shared
+    else if (name === 'settings')      return Screens.settings(screen);
+  };
+
+  Promise.resolve().then(dispatch).catch(err => {
+    console.error(err);
+    renderScreenError(screen, err);
+  });
+}
+
+function renderScreenError(root, err) {
+  const msg = (err && err.message) || String(err);
+  const isUnknown = /Unknown action/i.test(msg);
+  root.innerHTML = '';
+  root.appendChild(el('div', { class: 'empty' },
+    el('div', { class: 'empty-illustration', html: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="32" r="24"/><path d="M32 18v18M32 44v.5"/></svg>` }),
+    el('p', { class: 'empty-title' }, isUnknown ? 'Backend not redeployed yet' : 'Something went wrong'),
+    el('p', { class: 'empty-body' }, isUnknown
+      ? 'The Apps Script Web App needs to be redeployed so it picks up the new Brew Lab actions. Open Apps Script → Deploy → Manage deployments → pencil → Version: New version → Deploy.'
+      : msg),
+    el('div', { style: 'margin-top:14px' },
+      el('button', { class: 'btn', onclick: () => render() }, 'Try again'),
+    ),
+  ));
 }
 
 document.addEventListener('click', (e) => {
@@ -289,6 +312,13 @@ const Screens = {
   },
 
   // ─── Brew Lab screens ─────────────────────────────────────────────
+  async brewhome(root) {
+    if (!State.config) State.config = await api.getConfig();
+    const reports = await api.getBrewReports();
+    State.sites = await api.listSites();
+    State.brews = await api.listBrews();
+    renderBrewHome(root, reports);
+  },
   async sites(root) {
     if (!State.config) State.config = await api.getConfig();
     State.sites = await api.listSites();
@@ -795,7 +825,7 @@ function field(label, input) {
 }
 
 // ─── Settings screen ─────────────────────────────────────────────
-const CONFIG_CATEGORIES = [
+const PLANT_CONFIG_CATEGORIES = [
   { key: 'Species Categories', label: 'Species Categories', hint: 'Tree, Shrub, Herb, Fern… (these drive the per-category icons + colours)' },
   { key: 'Propagation Methods', label: 'Propagation Methods', hint: 'Seed, Cutting, Division, Layering, Grafting…' },
   { key: 'Phases', label: 'Phases', hint: 'Sourcing, Sown, Rooting, Hardening Off…' },
@@ -805,6 +835,21 @@ const CONFIG_CATEGORIES = [
   { key: 'Light Exposure', label: 'Light Exposure', hint: 'Full Sun, Part Shade, Indoor…' },
   { key: 'Rainfall', label: 'Rainfall', hint: 'None, Light, Heavy…' },
 ];
+
+const BREW_CONFIG_CATEGORIES = [
+  { key: 'Site Types',          label: 'Site Types',          hint: 'Treated, Control — drives the colour-coding on site cards.' },
+  { key: 'Crops',               label: 'Crops',               hint: 'Tomato, Lettuce, Pasture… add whatever he\'s testing on.' },
+  { key: 'Soil Types',          label: 'Soil Types',          hint: 'Sandy loam, Clay, Loam…' },
+  { key: 'Brew Statuses',       label: 'Brew Statuses',       hint: 'Brewing, Ready, In use, Expired, Archived…' },
+  { key: 'Manure Types',        label: 'Manure Types',        hint: 'Horse, Cow, Chicken… or "None".' },
+  { key: 'Manure States',       label: 'Manure States',       hint: 'Composted, Aged, Fresh — flagged in safety banners.' },
+  { key: 'Application Methods', label: 'Application Methods', hint: 'Foliar, Soil drench, Fertigation, In-furrow…' },
+];
+
+const CONFIG_CATEGORIES_BY_MODE = {
+  plant: PLANT_CONFIG_CATEGORIES,
+  brew:  BREW_CONFIG_CATEGORIES,
+};
 
 // ─── Reports screen ─────────────────────────────────────────────────
 function renderReports(root, reports) {
@@ -954,14 +999,17 @@ function makeRemovableChip(v, cat) {
 
 function renderSettings(root) {
   root.innerHTML = '';
+  const cats = CONFIG_CATEGORIES_BY_MODE[State.mode] || PLANT_CONFIG_CATEGORIES;
 
   root.appendChild(el('div', { class: 'settings-intro' },
-    el('h2', { class: 'settings-title' }, 'Dropdown Lists'),
+    el('h2', { class: 'settings-title' }, currentMode().label + ' — Setup'),
     el('p', { class: 'settings-blurb' },
-      'These are the values that appear in every dropdown across the app. Add new ones, remove old ones — changes apply everywhere immediately.')
+      'These are the values that appear in every dropdown across ' + currentMode().label + '. Add new ones, remove old ones — changes apply everywhere immediately.'),
+    el('p', { class: 'settings-blurb', style: 'margin-top:6px;font-size:12px;opacity:0.7' },
+      'Need to manage the other mode? Tap the brand to switch.'),
   ));
 
-  CONFIG_CATEGORIES.forEach(cat => {
+  cats.forEach(cat => {
     root.appendChild(renderConfigSection(cat));
   });
 }
@@ -1006,10 +1054,77 @@ function renderConfigSection(cat) {
   return section;
 }
 
+// ─── Brew Lab — Home dashboard ────────────────────────────────────
+function renderBrewHome(root, reports) {
+  root.innerHTML = '';
+
+  root.appendChild(el('div', { class: 'settings-intro' },
+    el('h2', { class: 'settings-title' }, 'Brew Lab'),
+    el('p', { class: 'settings-blurb' },
+      'R&D for liquid biofertiliser brews. Pick where to dive in:'),
+  ));
+
+  const tiles = el('div', { class: 'home-tiles' });
+  tiles.appendChild(homeTile({
+    label: 'Sites',
+    sub: `${(reports.totals && reports.totals.sites) || 0} test ${reports.totals && reports.totals.sites === 1 ? 'site' : 'sites'}`,
+    accent: 'tile-treated',
+    iconHtml: siteIconSvg(),
+    onClick: () => Router.go('sites'),
+  }));
+  tiles.appendChild(homeTile({
+    label: 'Brews',
+    sub: `${(reports.totals && reports.totals.brews) || 0} ${reports.totals && reports.totals.brews === 1 ? 'recipe' : 'recipes'}`,
+    accent: 'tile-brew',
+    iconHtml: brewIconSvg(),
+    onClick: () => Router.go('brews'),
+  }));
+  tiles.appendChild(homeTile({
+    label: 'Stats',
+    sub: `${(reports.totals && reports.totals.observations) || 0} observations`,
+    accent: 'tile-stats',
+    iconHtml: '<svg viewBox="0 0 48 48" fill="currentColor"><rect x="8" y="28" width="6" height="14" rx="1"/><rect x="20" y="20" width="6" height="22" rx="1"/><rect x="32" y="12" width="6" height="30" rx="1"/></svg>',
+    onClick: () => Router.go('brewstats'),
+  }));
+  tiles.appendChild(homeTile({
+    label: 'Setup',
+    sub: 'Manage dropdown lists',
+    accent: 'tile-setup',
+    iconHtml: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="5"/><path d="M24 4v6M24 38v6M4 24h6M38 24h6M9 9l4 4M35 35l4 4M9 39l4-4M35 13l4-4"/></svg>',
+    onClick: () => Router.go('settings'),
+  }));
+  root.appendChild(tiles);
+
+  // Quick recent activity
+  const recent = el('div', { class: 'config-section' },
+    el('div', { class: 'config-section-head' },
+      el('h3', {}, 'Quick add'),
+      el('p', { class: 'config-hint' }, 'Get straight into logging — these jump past the menus.'),
+    ),
+    el('div', { class: 'quick-row' },
+      el('button', { class: 'btn-primary', onclick: () => openAddSiteModal() }, '＋ Add new site'),
+      el('button', { class: 'btn', onclick: () => openAddBrewModal() }, '＋ Log new brew'),
+    ),
+  );
+  root.appendChild(recent);
+}
+
+function homeTile({ label, sub, accent, iconHtml, onClick }) {
+  return el('button', { class: 'home-tile ' + (accent || ''), onclick: onClick },
+    el('div', { class: 'home-tile-icon', html: iconHtml }),
+    el('div', { class: 'home-tile-label' }, label),
+    el('div', { class: 'home-tile-sub' }, sub),
+  );
+}
+
 // ─── Brew Lab — Sites grid ────────────────────────────────────────
 function renderSitesGrid(root) {
   root.innerHTML = '';
-  const sticky = el('div', { class: 'sticky-bar' },
+  root.appendChild(el('div', { class: 'screen-header' },
+    el('h2', { class: 'screen-title' }, 'Sites'),
+    el('button', { class: 'btn-primary', onclick: () => openAddSiteModal() }, '＋ Add site'),
+  ));
+  const sticky = el('div', { class: 'sticky-bar sticky-bar-secondary' },
     el('div', { class: 'search' },
       el('span', { class: 'search-icon', html: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>` }),
       el('input', {
@@ -1196,7 +1311,11 @@ function parsePhotoUrls(s) {
 // ─── Brew Lab — Brews grid + detail ───────────────────────────────
 function renderBrewsGrid(root) {
   root.innerHTML = '';
-  const sticky = el('div', { class: 'sticky-bar' },
+  root.appendChild(el('div', { class: 'screen-header' },
+    el('h2', { class: 'screen-title' }, 'Brews'),
+    el('button', { class: 'btn-primary', onclick: () => openAddBrewModal() }, '＋ Log brew'),
+  ));
+  const sticky = el('div', { class: 'sticky-bar sticky-bar-secondary' },
     el('div', { class: 'search' },
       el('span', { class: 'search-icon', html: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>` }),
       el('input', {
