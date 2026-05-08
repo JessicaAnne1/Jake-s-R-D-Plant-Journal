@@ -162,6 +162,18 @@ window.api = {
   async deleteSite(siteId)                { return call('deleteSite', { siteId }); },
   async deleteBrew(brewId)                { return call('deleteBrew', { brewId }); },
 
+  // Batch screen loads — one round-trip per page
+  async getGridScreenData()               { return call('getGridScreenData'); },
+  async getSpeciesScreenData(speciesId)   { return call('getSpeciesScreenData', { speciesId }); },
+  async getRunScreenData(runId)           { return call('getRunScreenData', { runId }); },
+  async getReportsScreenData()            { return call('getReportsScreenData'); },
+  async getBrewHomeData()                 { return call('getBrewHomeData'); },
+  async getSitesScreenData()              { return call('getSitesScreenData'); },
+  async getBrewsScreenData()              { return call('getBrewsScreenData'); },
+  async getSiteScreenData(siteId)         { return call('getSiteScreenData', { siteId }); },
+  async getBrewScreenData(brewId)         { return call('getBrewScreenData', { brewId }); },
+  async getBrewStatsData()                { return call('getBrewStatsData'); },
+
   async listApplicationsBySite(siteId)    { return call('listApplicationsBySite', { siteId }); },
   async listApplicationsByBrew(brewId)    { return call('listApplicationsByBrew', { brewId }); },
   async createApplication(data)           { return call('createApplication', data); },

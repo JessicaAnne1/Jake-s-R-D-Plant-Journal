@@ -347,6 +347,42 @@ function getOrCreateSubfolder_(parent, name) {
   return parent.createFolder(name);
 }
 
+// ─── Batch endpoints (one round-trip per screen) ───────────────────
+function getBrewHomeData() {
+  return {
+    reports: getBrewReports(),
+    sites: listSites(),
+    brews: listBrews(),
+    config: getConfig(),
+  };
+}
+function getSitesScreenData() {
+  return { sites: listSites(), config: getConfig() };
+}
+function getBrewsScreenData() {
+  return { brews: listBrews(), config: getConfig() };
+}
+function getSiteScreenData(siteId) {
+  return {
+    site: getSite(siteId),
+    applications: listApplicationsBySite(siteId),
+    observations: listObservationsBySite(siteId),
+    brews: listBrews(),
+    config: getConfig(),
+  };
+}
+function getBrewScreenData(brewId) {
+  return {
+    brew: getBrew(brewId),
+    applications: listApplicationsByBrew(brewId),
+    sites: listSites(),
+    config: getConfig(),
+  };
+}
+function getBrewStatsData() {
+  return { reports: getBrewReports(), config: getConfig() };
+}
+
 // ─── Brew Lab reports ───────────────────────────────────────────────
 function getBrewReports() {
   const sites = readBrewSheet_(BREW_SHEETS.SITES);

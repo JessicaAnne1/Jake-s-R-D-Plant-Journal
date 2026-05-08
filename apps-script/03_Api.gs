@@ -35,6 +35,18 @@ const API_ROUTES = {
 
   getReports:         () => getReports(),
 
+  // Batch screen loads (one round-trip per page)
+  getGridScreenData:        () => getGridScreenData(),
+  getSpeciesScreenData:     (p) => getSpeciesScreenData(p.speciesId),
+  getRunScreenData:         (p) => getRunScreenData(p.runId),
+  getReportsScreenData:     () => getReportsScreenData(),
+  getBrewHomeData:          () => getBrewHomeData(),
+  getSitesScreenData:       () => getSitesScreenData(),
+  getBrewsScreenData:       () => getBrewsScreenData(),
+  getSiteScreenData:        (p) => getSiteScreenData(p.siteId),
+  getBrewScreenData:        (p) => getBrewScreenData(p.brewId),
+  getBrewStatsData:         () => getBrewStatsData(),
+
   // Brew Lab
   listBrews:                () => listBrews(),
   getBrew:                  (p) => getBrew(p.brewId),

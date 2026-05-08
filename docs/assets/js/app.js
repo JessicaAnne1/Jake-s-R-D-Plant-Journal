@@ -288,88 +288,80 @@ async function duplicateCurrentRun(runId) {
 }
 
 // ─── Screens ────────────────────────────────────────────────────────
+// Each screen makes ONE batch API call that returns everything it needs.
+// Apps Script web apps add ~1s per round-trip so this is the biggest perf win.
 const Screens = {
   async grid(root) {
-    if (!State.config) State.config = await api.getConfig();
-    State.species = await api.listSpecies();
+    const data = await api.getGridScreenData();
+    State.config = data.config;
+    State.species = data.species;
     renderGrid(root);
   },
 
   async speciesDetail(root, speciesId) {
-    if (!State.config) State.config = await api.getConfig();
-    const [species, runs, notes] = await Promise.all([
-      api.getSpecies(speciesId),
-      api.listRunsBySpecies(speciesId),
-      api.listNotes('Species', speciesId),
-    ]);
-    if (!species) { Screens.placeholder(root, 'Not found', 'Species not found.'); return; }
-    renderSpeciesDetail(root, species, runs, notes);
+    const data = await api.getSpeciesScreenData(speciesId);
+    State.config = data.config;
+    if (!data.species) { Screens.placeholder(root, 'Not found', 'Species not found.'); return; }
+    renderSpeciesDetail(root, data.species, data.runs, data.notes);
+  },
+
+  async runDetail(root, runId) {
+    const data = await api.getRunScreenData(runId);
+    State.config = data.config;
+    if (!data.run) { Screens.placeholder(root, 'Not found', 'Run not found.'); return; }
+    renderRunDetail(root, data.run, data.species, data.notes);
+  },
+
+  async reports(root) {
+    const data = await api.getReportsScreenData();
+    State.config = data.config;
+    State.species = data.species;
+    renderReports(root, data.reports);
   },
 
   async settings(root) {
-    State.config = await api.getConfig();
+    if (!State.config) State.config = await api.getConfig();
     renderSettings(root);
   },
 
   // ─── Brew Lab screens ─────────────────────────────────────────────
   async brewhome(root) {
-    if (!State.config) State.config = await api.getConfig();
-    const reports = await api.getBrewReports();
-    State.sites = await api.listSites();
-    State.brews = await api.listBrews();
-    renderBrewHome(root, reports);
+    const data = await api.getBrewHomeData();
+    State.config = data.config;
+    State.sites = data.sites;
+    State.brews = data.brews;
+    renderBrewHome(root, data.reports);
   },
   async sites(root) {
-    if (!State.config) State.config = await api.getConfig();
-    State.sites = await api.listSites();
+    const data = await api.getSitesScreenData();
+    State.config = data.config;
+    State.sites = data.sites;
     renderSitesGrid(root);
   },
   async siteDetail(root, siteId) {
-    if (!State.config) State.config = await api.getConfig();
-    if (!State.brews.length) State.brews = await api.listBrews();
-    const [site, applications, observations] = await Promise.all([
-      api.getSite(siteId),
-      api.listApplicationsBySite(siteId),
-      api.listObservationsBySite(siteId),
-    ]);
-    if (!site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
-    renderSiteDetail(root, site, applications, observations);
+    const data = await api.getSiteScreenData(siteId);
+    State.config = data.config;
+    State.brews = data.brews;
+    if (!data.site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
+    renderSiteDetail(root, data.site, data.applications, data.observations);
   },
   async brews(root) {
-    if (!State.config) State.config = await api.getConfig();
-    State.brews = await api.listBrews();
+    const data = await api.getBrewsScreenData();
+    State.config = data.config;
+    State.brews = data.brews;
     renderBrewsGrid(root);
   },
   async brewDetail(root, brewId) {
-    if (!State.config) State.config = await api.getConfig();
-    if (!State.sites.length) State.sites = await api.listSites();
-    const [brew, applications] = await Promise.all([
-      api.getBrew(brewId),
-      api.listApplicationsByBrew(brewId),
-    ]);
-    if (!brew) { Screens.placeholder(root, 'Not found', 'Brew not found.'); return; }
-    renderBrewDetail(root, brew, applications);
+    const data = await api.getBrewScreenData(brewId);
+    State.config = data.config;
+    State.sites = data.sites;
+    if (!data.brew) { Screens.placeholder(root, 'Not found', 'Brew not found.'); return; }
+    renderBrewDetail(root, data.brew, data.applications);
   },
   async brewStats(root) {
-    if (!State.config) State.config = await api.getConfig();
-    const reports = await api.getBrewReports();
-    renderBrewStats(root, reports);
-  },
-
-  async reports(root) {
-    if (!State.config) State.config = await api.getConfig();
-    const reports = await api.getReports();
-    if (!State.species.length) State.species = await api.listSpecies();
-    renderReports(root, reports);
-  },
-
-  async runDetail(root, runId) {
-    if (!State.config) State.config = await api.getConfig();
-    const run = await api.getRun(runId);
-    if (!run) { Screens.placeholder(root, 'Not found', 'Run not found.'); return; }
-    const species = await api.getSpecies(run['Species ID']);
-    const notes = await api.listNotes('Run', runId);
-    renderRunDetail(root, run, species, notes);
+    const data = await api.getBrewStatsData();
+    State.config = data.config;
+    renderBrewStats(root, data.reports);
   },
 
   placeholder(root, title, body) {

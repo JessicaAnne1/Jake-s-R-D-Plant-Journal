@@ -274,6 +274,31 @@ function addNote(linkedType, linkedId, text) {
   return record;
 }
 
+// ─── Batch endpoints (one round-trip per screen) ───────────────────────────
+function getGridScreenData() {
+  return { species: listSpecies(), config: getConfig() };
+}
+function getSpeciesScreenData(speciesId) {
+  return {
+    species: getSpecies(speciesId),
+    runs: listRunsBySpecies(speciesId),
+    notes: listNotes('Species', speciesId),
+    config: getConfig(),
+  };
+}
+function getRunScreenData(runId) {
+  const run = getRun(runId);
+  return {
+    run: run,
+    species: run ? getSpecies(run['Species ID']) : null,
+    notes: listNotes('Run', runId),
+    config: getConfig(),
+  };
+}
+function getReportsScreenData() {
+  return { reports: getReports(), species: listSpecies(), config: getConfig() };
+}
+
 // ─── Reports ────────────────────────────────────────────────────────────────
 function getReports() {
   const runs = readAll_(SHEETS.RUNS);
