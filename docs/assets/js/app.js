@@ -239,6 +239,7 @@ function render() {
     else if (name === 'brewhome')      return Screens.brewhome(screen);
     else if (name === 'sites')         return Screens.sites(screen);
     else if (name === 'site')          return Screens.siteDetail(screen, params.siteId);
+    else if (name === 'siteEdit')      return Screens.siteEdit(screen, params.siteId);
     else if (name === 'brews')         return Screens.brews(screen);
     else if (name === 'brew')          return Screens.brewDetail(screen, params.brewId);
     else if (name === 'brewstats')     return Screens.brewStats(screen);
@@ -440,6 +441,14 @@ const Screens = {
       State.brews = data.brews;
       if (!data.site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
       renderSiteDetail(root, data.site, data.applications, data.observations);
+    });
+  },
+  async siteEdit(root, siteId) {
+    await swrScreen('site:' + siteId, () => api.getSiteScreenData(siteId), (data) => {
+      State.config = data.config;
+      State.brews = data.brews;
+      if (!data.site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
+      renderSiteEdit(root, data.site, data.applications, data.observations);
     });
   },
   async brews(root) {
@@ -1306,11 +1315,17 @@ function renderSiteDetail(root, site, applications, observations) {
   root.innerHTML = '';
   const isControl = site['Site Type'] === 'Control';
 
-  const hero = el('div', { class: 'detail-hero ' + (isControl ? 'cat-control' : 'cat-treated') });
+  const hero = el('div', {
+    class: 'detail-hero hero-tappable ' + (isControl ? 'cat-control' : 'cat-treated'),
+    onclick: (e) => {
+      // Don't navigate if a button inside was tapped
+      if (e.target.closest('button, a')) return;
+      Router.go('siteEdit', { siteId: site['Site ID'] });
+    },
+  });
   hero.style.setProperty('--tint', isControl ? '#7a5ab0' : '#2d8a3e');
   hero.append(
     el('div', { class: 'hero-actions' },
-      el('button', { class: 'hero-edit', onclick: () => openEditSiteModal(site) }, '✎ Edit'),
       makeArmedDeleteButton({
         confirmLabel: () => 'DELETE?',
         warn: () => `Delete ${site['Name'] || 'site'}? Existing applications and observations will become orphaned. Tap again to confirm.`,
@@ -1326,6 +1341,7 @@ function renderSiteDetail(root, site, applications, observations) {
         },
       }),
     ),
+    el('div', { class: 'hero-tap-hint' }, '✎ Tap to edit'),
     el('div', { class: 'hero-icon', html: siteIconSvg() }),
     el('h2', {}, site['Name'] || '(unnamed site)'),
     site['Owner / Farm'] ? el('p', { class: 'sci' }, site['Owner / Farm']) : null,
@@ -1358,6 +1374,97 @@ function renderSiteDetail(root, site, applications, observations) {
   }
 
   // Observations
+  root.appendChild(el('div', { class: 'section-header' },
+    el('h3', { html: `Observations ${observations.length ? `<span class="count">${observations.length}</span>` : ''}` }),
+    el('button', { class: 'btn-add-inline', 'data-action': 'add-observation', 'data-site-id': site['Site ID'] }, '＋ Log observation'),
+  ));
+  if (observations.length === 0) {
+    root.appendChild(emptyState('No observations yet', 'Take a reading and log it — photos welcome.'));
+  } else {
+    const list = el('div', { class: 'notes-list' });
+    observations.forEach(o => list.appendChild(observationCard(o)));
+    root.appendChild(list);
+  }
+}
+
+// ─── Site EDIT screen — full form + apps + obs in one page ─────────
+function renderSiteEdit(root, site, applications, observations) {
+  root.innerHTML = '';
+  const isControl = site['Site Type'] === 'Control';
+
+  // Slim header bar — site name + status pill + back to overview
+  root.appendChild(el('div', { class: 'edit-header ' + (isControl ? 'cat-control' : 'cat-treated') },
+    el('button', {
+      class: 'btn-ghost', style: 'padding:6px 10px',
+      onclick: () => Router.go('site', { siteId: site['Site ID'] }, { push: false }),
+    }, '← Overview'),
+    el('div', { class: 'edit-header-title' },
+      el('strong', {}, site['Name'] || '(unnamed site)'),
+      el('span', { class: 'pill', style: 'margin-left:8px' }, isControl ? 'CONTROL' : 'TREATED'),
+    ),
+  ));
+
+  // Editable form
+  const form = el('div', { class: 'run-detail' },
+    el('h3', { style: 'margin:0 0 10px;font-family:var(--display)' }, 'Edit site details'),
+  );
+  const inputs = {};
+  const f = (label, input) => {
+    inputs[input.name] = input;
+    form.appendChild(el('div', { class: 'field' }, el('label', {}, label), input));
+  };
+  f('Site name', el('input', { type: 'text', name: 'Name', value: site['Name'] || '', autocomplete: 'off' }));
+  f('Owner / farm', el('input', { type: 'text', name: 'Owner / Farm', value: site['Owner / Farm'] || '', autocomplete: 'off' }));
+  f('Location', el('input', { type: 'text', name: 'Location', value: site['Location'] || '', autocomplete: 'off' }));
+  f('Crop', selectFromConfig('Crop', 'Crops', site['Crop']));
+  f('Soil type', selectFromConfig('Soil Type', 'Soil Types', site['Soil Type']));
+  f('Site type', selectFromConfig('Site Type', 'Site Types', site['Site Type']));
+  f('Paired site (optional)', el('input', { type: 'text', name: 'Paired Site ID', value: site['Paired Site ID'] || '', placeholder: 'e.g. ST-0002', autocomplete: 'off' }));
+  f('Baseline notes', el('textarea', { name: 'Baseline Notes' }, site['Baseline Notes'] || ''));
+
+  form.appendChild(el('div', { class: 'run-action-row' },
+    el('button', { class: 'btn-primary', onclick: async () => {
+      const data = {};
+      Object.keys(inputs).forEach(k => { data[k] = inputs[k].value; });
+      if (!data['Name']) { toast('Name required'); return; }
+      try {
+        await api.updateSite(site['Site ID'], data);
+        toast('Saved');
+        Router.go('siteEdit', { siteId: site['Site ID'] }, { push: false });
+      } catch (err) { toast('Error: ' + err.message); }
+    }}, 'Save changes'),
+    makeArmedDeleteButton({
+      warn: () => `Delete ${site['Name'] || 'site'}? Existing applications and observations will become orphaned. Tap again to confirm.`,
+      action: async () => {
+        const result = await api.deleteSite(site['Site ID']);
+        State.sites = State.sites.filter(s => s['Site ID'] !== site['Site ID']);
+        let msg = `Deleted ${site['Name'] || site['Site ID']}`;
+        if (result.orphanedApplications || result.orphanedObservations) {
+          msg += ` — ${result.orphanedApplications + result.orphanedObservations} orphan record(s) left in sheet`;
+        }
+        toast(msg);
+        Router.go('sites', {}, { reset: true });
+      },
+    }),
+  ));
+  root.appendChild(form);
+
+  // Same applications + observations sections as siteDetail
+  root.appendChild(el('div', { class: 'section-header' },
+    el('h3', { html: `Applications ${applications.length ? `<span class="count">${applications.length}</span>` : ''}` }),
+    el('button', { class: 'btn-add-inline', 'data-action': 'add-application', 'data-site-id': site['Site ID'] }, '＋ Apply brew'),
+  ));
+  if (applications.length === 0) {
+    root.appendChild(emptyState('No applications yet', 'Tap "Apply brew" to log the first one.'));
+  } else {
+    const grid = el('div', { class: 'run-grid' });
+    applications.forEach(a => {
+      const brew = State.brews.find(b => b['Brew ID'] === a['Brew ID']);
+      grid.appendChild(applicationCard(a, brew));
+    });
+    root.appendChild(grid);
+  }
+
   root.appendChild(el('div', { class: 'section-header' },
     el('h3', { html: `Observations ${observations.length ? `<span class="count">${observations.length}</span>` : ''}` }),
     el('button', { class: 'btn-add-inline', 'data-action': 'add-observation', 'data-site-id': site['Site ID'] }, '＋ Log observation'),
