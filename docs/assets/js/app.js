@@ -8,7 +8,77 @@ const State = {
   filters: { search: '', category: '' },
   history: [],     // navigation stack: [{ name, params }]
   current: { name: 'grid', params: {} },
+  renderSeq: 0,    // bumps every render(), used to discard stale fetches
 };
+
+// Wrap mutating API calls so cache is always invalidated afterwards.
+// Catches creates / updates / deletes / addNote / config edits.
+function wrapApiMutations() {
+  if (!window.api) return;
+  const mutating = [
+    'createSpecies', 'updateSpecies',
+    'createRun', 'updateRun', 'duplicateRun',
+    'addNote',
+    'createBrew', 'updateBrew', 'deleteBrew',
+    'createSite', 'updateSite', 'deleteSite',
+    'createApplication', 'createObservation',
+    'addConfigValue', 'removeConfigValue',
+    'uploadBrewPhoto',
+  ];
+  mutating.forEach(name => {
+    const orig = api[name];
+    if (typeof orig !== 'function') return;
+    api[name] = async function(...args) {
+      const result = await orig.apply(api, args);
+      try { swr.invalidateAll(); } catch {}
+      return result;
+    };
+  });
+}
+
+// ─── Stale-while-revalidate cache ───────────────────────────────────
+// Render screens instantly from localStorage, then update from network.
+// Apps Script web-app round-trips are ~1-2s, this is the perceived-perf
+// fix for that.
+const SWR_PREFIX = 'jrd-swr:';
+const swr = {
+  get(key) {
+    try {
+      const raw = localStorage.getItem(SWR_PREFIX + key);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  },
+  set(key, data) {
+    try { localStorage.setItem(SWR_PREFIX + key, JSON.stringify(data)); }
+    catch (e) {
+      // Quota — clear our entries and try once more
+      Object.keys(localStorage).filter(k => k.startsWith(SWR_PREFIX))
+        .forEach(k => localStorage.removeItem(k));
+      try { localStorage.setItem(SWR_PREFIX + key, JSON.stringify(data)); } catch {}
+    }
+  },
+  invalidateAll() {
+    Object.keys(localStorage).filter(k => k.startsWith(SWR_PREFIX))
+      .forEach(k => localStorage.removeItem(k));
+  },
+};
+
+// Helper for screen loaders: render instantly from cache (if any),
+// then refetch in background and re-render with fresh data. Skips
+// the second render if user has navigated to a different screen.
+async function swrScreen(cacheKey, fetcher, applyData) {
+  const cached = swr.get(cacheKey);
+  if (cached) applyData(cached, true);
+  const seq = State.renderSeq;
+  try {
+    const fresh = await fetcher();
+    swr.set(cacheKey, fresh);
+    if (State.renderSeq === seq) applyData(fresh, false);
+  } catch (err) {
+    if (!cached) throw err;
+    console.warn('SWR refresh failed for ' + cacheKey, err);
+  }
+}
 
 // ─── Mode definitions ───────────────────────────────────────────────
 const MODES = {
@@ -132,6 +202,7 @@ const Router = {
 };
 
 function render() {
+  State.renderSeq++;
   const { name, params } = State.current;
   const screen = $('#screen');
   screen.innerHTML = '<div class="loading">Loading…</div>';
@@ -288,35 +359,39 @@ async function duplicateCurrentRun(runId) {
 }
 
 // ─── Screens ────────────────────────────────────────────────────────
-// Each screen makes ONE batch API call that returns everything it needs.
-// Apps Script web apps add ~1s per round-trip so this is the biggest perf win.
+// Each screen makes ONE batch API call. Wrapped in SWR so the cached
+// version paints instantly and fresh data replaces it when it arrives.
 const Screens = {
   async grid(root) {
-    const data = await api.getGridScreenData();
-    State.config = data.config;
-    State.species = data.species;
-    renderGrid(root);
+    await swrScreen('grid', () => api.getGridScreenData(), (data) => {
+      State.config = data.config;
+      State.species = data.species;
+      renderGrid(root);
+    });
   },
 
   async speciesDetail(root, speciesId) {
-    const data = await api.getSpeciesScreenData(speciesId);
-    State.config = data.config;
-    if (!data.species) { Screens.placeholder(root, 'Not found', 'Species not found.'); return; }
-    renderSpeciesDetail(root, data.species, data.runs, data.notes);
+    await swrScreen('species:' + speciesId, () => api.getSpeciesScreenData(speciesId), (data) => {
+      State.config = data.config;
+      if (!data.species) { Screens.placeholder(root, 'Not found', 'Species not found.'); return; }
+      renderSpeciesDetail(root, data.species, data.runs, data.notes);
+    });
   },
 
   async runDetail(root, runId) {
-    const data = await api.getRunScreenData(runId);
-    State.config = data.config;
-    if (!data.run) { Screens.placeholder(root, 'Not found', 'Run not found.'); return; }
-    renderRunDetail(root, data.run, data.species, data.notes);
+    await swrScreen('run:' + runId, () => api.getRunScreenData(runId), (data) => {
+      State.config = data.config;
+      if (!data.run) { Screens.placeholder(root, 'Not found', 'Run not found.'); return; }
+      renderRunDetail(root, data.run, data.species, data.notes);
+    });
   },
 
   async reports(root) {
-    const data = await api.getReportsScreenData();
-    State.config = data.config;
-    State.species = data.species;
-    renderReports(root, data.reports);
+    await swrScreen('reports', () => api.getReportsScreenData(), (data) => {
+      State.config = data.config;
+      State.species = data.species;
+      renderReports(root, data.reports);
+    });
   },
 
   async settings(root) {
@@ -326,42 +401,48 @@ const Screens = {
 
   // ─── Brew Lab screens ─────────────────────────────────────────────
   async brewhome(root) {
-    const data = await api.getBrewHomeData();
-    State.config = data.config;
-    State.sites = data.sites;
-    State.brews = data.brews;
-    renderBrewHome(root, data.reports);
+    await swrScreen('brewhome', () => api.getBrewHomeData(), (data) => {
+      State.config = data.config;
+      State.sites = data.sites;
+      State.brews = data.brews;
+      renderBrewHome(root, data.reports);
+    });
   },
   async sites(root) {
-    const data = await api.getSitesScreenData();
-    State.config = data.config;
-    State.sites = data.sites;
-    renderSitesGrid(root);
+    await swrScreen('sites', () => api.getSitesScreenData(), (data) => {
+      State.config = data.config;
+      State.sites = data.sites;
+      renderSitesGrid(root);
+    });
   },
   async siteDetail(root, siteId) {
-    const data = await api.getSiteScreenData(siteId);
-    State.config = data.config;
-    State.brews = data.brews;
-    if (!data.site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
-    renderSiteDetail(root, data.site, data.applications, data.observations);
+    await swrScreen('site:' + siteId, () => api.getSiteScreenData(siteId), (data) => {
+      State.config = data.config;
+      State.brews = data.brews;
+      if (!data.site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
+      renderSiteDetail(root, data.site, data.applications, data.observations);
+    });
   },
   async brews(root) {
-    const data = await api.getBrewsScreenData();
-    State.config = data.config;
-    State.brews = data.brews;
-    renderBrewsGrid(root);
+    await swrScreen('brews', () => api.getBrewsScreenData(), (data) => {
+      State.config = data.config;
+      State.brews = data.brews;
+      renderBrewsGrid(root);
+    });
   },
   async brewDetail(root, brewId) {
-    const data = await api.getBrewScreenData(brewId);
-    State.config = data.config;
-    State.sites = data.sites;
-    if (!data.brew) { Screens.placeholder(root, 'Not found', 'Brew not found.'); return; }
-    renderBrewDetail(root, data.brew, data.applications);
+    await swrScreen('brew:' + brewId, () => api.getBrewScreenData(brewId), (data) => {
+      State.config = data.config;
+      State.sites = data.sites;
+      if (!data.brew) { Screens.placeholder(root, 'Not found', 'Brew not found.'); return; }
+      renderBrewDetail(root, data.brew, data.applications);
+    });
   },
   async brewStats(root) {
-    const data = await api.getBrewStatsData();
-    State.config = data.config;
-    renderBrewStats(root, data.reports);
+    await swrScreen('brewstats', () => api.getBrewStatsData(), (data) => {
+      State.config = data.config;
+      renderBrewStats(root, data.reports);
+    });
   },
 
   placeholder(root, title, body) {
@@ -1912,6 +1993,7 @@ window.addEventListener('DOMContentLoaded', () => {
       document.body.firstChild
     );
   }
+  wrapApiMutations();
   applyMode();
   Router.go(currentMode().home, {}, { push: false });
 });
