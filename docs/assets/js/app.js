@@ -188,19 +188,37 @@ const fmtDate = (d) => {
 const slug = (s) => (s || '').toLowerCase().replace(/[^a-z]/g, '');
 
 // ─── Router ─────────────────────────────────────────────────────────
+// Integrates with the browser History API so the Android system back
+// button (and Chrome's back gesture) navigates within the app instead
+// of exiting it. pushState adds an entry; popstate fires when the user
+// hits back; we render whatever screen state was popped.
 const Router = {
   go(name, params = {}, { push = true, reset = false } = {}) {
-    if (reset) State.history = [];
-    if (push && !reset && State.current.name !== name) State.history.push(State.current);
     State.current = { name, params };
+    const stateObj = { app: 'jakes-rd', name, params };
+    if (push && !reset) {
+      try { history.pushState(stateObj, ''); } catch {}
+    } else {
+      try { history.replaceState(stateObj, ''); } catch {}
+    }
     render();
   },
   back() {
-    const prev = State.history.pop();
-    if (prev) { State.current = prev; render(); }
-    else      { Router.go(currentMode().home, {}, { reset: true }); }
+    // Triggers a popstate which re-renders the previous screen.
+    history.back();
   },
 };
+
+window.addEventListener('popstate', (e) => {
+  // User hit back (system or in-app). Render what was popped.
+  if (e.state && e.state.app === 'jakes-rd' && e.state.name) {
+    State.current = { name: e.state.name, params: e.state.params || {} };
+    render();
+  }
+  // If e.state is null, we're at the entry that pre-existed our app —
+  // let the browser/PWA handle it (i.e. exit). That's the expected
+  // behaviour when you back past the home screen.
+});
 
 function render() {
   State.renderSeq++;
@@ -1391,9 +1409,11 @@ function observationCard(o) {
     photos.length
       ? el('div', { class: 'photo-strip' },
           ...photos.map(url =>
-            el('a', { href: url, target: '_blank', rel: 'noopener' },
-              el('img', { src: url, alt: 'observation photo', loading: 'lazy' })
-            )
+            el('button', {
+              type: 'button',
+              class: 'photo-thumb-btn',
+              onclick: (e) => { e.stopPropagation(); openPhotoLightbox(url, photos); },
+            }, el('img', { src: url, alt: 'observation photo', loading: 'lazy' }))
           )
         )
       : null,
@@ -2044,6 +2064,50 @@ function closeModal() {
   const root = $('#modal-root');
   root.innerHTML = '';
   document.body.style.overflow = '';
+}
+
+// ─── In-app photo lightbox ──────────────────────────────────────────
+function openPhotoLightbox(url, allUrls = [url]) {
+  const root = $('#modal-root');
+  const close = () => { root.innerHTML = ''; document.body.style.overflow = ''; };
+  document.body.style.overflow = 'hidden';
+
+  let idx = allUrls.indexOf(url);
+  if (idx < 0) idx = 0;
+
+  const img = el('img', { src: allUrls[idx], class: 'lightbox-img', alt: '' });
+  const counter = el('span', { class: 'lightbox-count' }, `${idx + 1} / ${allUrls.length}`);
+  const update = (delta) => {
+    idx = (idx + delta + allUrls.length) % allUrls.length;
+    img.src = allUrls[idx];
+    counter.textContent = `${idx + 1} / ${allUrls.length}`;
+  };
+
+  const backdrop = el('div', { class: 'lightbox-backdrop',
+    onclick: (e) => { if (e.target === backdrop) close(); },
+  },
+    img,
+    el('button', { class: 'lightbox-close', onclick: close, 'aria-label': 'Close' }, '×'),
+    allUrls.length > 1
+      ? el('div', { class: 'lightbox-nav' },
+          el('button', { class: 'lightbox-arrow', onclick: () => update(-1), 'aria-label': 'Previous' }, '‹'),
+          counter,
+          el('button', { class: 'lightbox-arrow', onclick: () => update(1), 'aria-label': 'Next' }, '›'),
+        )
+      : null,
+  );
+
+  // Swipe gestures on phone
+  let startX = 0;
+  backdrop.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+  backdrop.addEventListener('touchend', (e) => {
+    if (allUrls.length < 2) return;
+    const dx = (e.changedTouches[0].clientX - startX);
+    if (Math.abs(dx) > 50) update(dx < 0 ? 1 : -1);
+  });
+
+  root.innerHTML = '';
+  root.appendChild(backdrop);
 }
 
 function openAddObservationModal(siteId) {
