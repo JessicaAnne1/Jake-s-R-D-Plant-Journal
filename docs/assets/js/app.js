@@ -1404,10 +1404,12 @@ function renderSiteEdit(root, site, applications, observations) {
     ),
   ));
 
-  // Editable form
-  const form = el('div', { class: 'run-detail' },
-    el('h3', { style: 'margin:0 0 10px;font-family:var(--display)' }, 'Edit site details'),
-  );
+  // Collapsible edit form — keeps apps + obs visible without scrolling.
+  const form = el('details', { class: 'edit-panel' });
+  form.appendChild(el('summary', { class: 'edit-panel-summary' },
+    el('span', {}, '✎ Edit site details'),
+    el('span', { class: 'edit-panel-chev' }, '▾'),
+  ));
   const inputs = {};
   const f = (label, input) => {
     inputs[input.name] = input;
