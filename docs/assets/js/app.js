@@ -1,11 +1,85 @@
 // ─── State ──────────────────────────────────────────────────────────
 const State = {
+  mode: localStorage.getItem('jakes-mode') || 'plant',  // 'plant' | 'brew'
   config: null,
   species: [],
+  brews: [],
+  sites: [],
   filters: { search: '', category: '' },
   history: [],     // navigation stack: [{ name, params }]
   current: { name: 'grid', params: {} },
 };
+
+// ─── Mode definitions ───────────────────────────────────────────────
+const MODES = {
+  plant: {
+    label: 'PLANT JOURNAL',
+    home: 'grid',
+    accent: 'var(--moss)',
+    brandSub: 'PLANT JOURNAL',
+    fabAction: 'fab-plant',
+    nav: [
+      { name: 'grid',    label: 'Specimens', icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>' },
+      { name: 'reports', label: 'Stats',     icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg>' },
+    ],
+  },
+  brew: {
+    label: 'BREW LAB',
+    home: 'sites',
+    accent: 'var(--terra)',
+    brandSub: 'BREW LAB',
+    fabAction: 'fab-brew',
+    nav: [
+      { name: 'sites',        label: 'Sites',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 7v12H3V9z"/><path d="M9 21V13h6v8"/></svg>' },
+      { name: 'brews',        label: 'Brews',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/><path d="M8 13c2 1 4-1 6 0s4-1 6 0"/></svg>' },
+      { name: 'brewstats',    label: 'Stats',  icon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg>' },
+    ],
+  },
+};
+function currentMode() { return MODES[State.mode]; }
+
+function toggleMode() {
+  State.mode = State.mode === 'plant' ? 'brew' : 'plant';
+  localStorage.setItem('jakes-mode', State.mode);
+  State.history = [];
+  State.filters = { search: '', category: '' };
+  applyMode();
+  Router.go(currentMode().home, {}, { reset: true });
+  toast('Switched to ' + currentMode().label);
+}
+
+function applyMode() {
+  const m = currentMode();
+  $('#brand-sub').textContent = m.brandSub;
+  document.body.dataset.mode = State.mode;
+  renderBottomNav();
+}
+
+function renderBottomNav() {
+  const nav = $('#bottom-nav');
+  if (!nav) return;
+  const m = currentMode();
+  nav.innerHTML = '';
+  // First nav item
+  nav.appendChild(navButton(m.nav[0]));
+  // FAB centered
+  const fab = el('button', {
+    class: 'nav-btn fab',
+    'data-action': m.fabAction,
+    'aria-label': 'Add',
+  });
+  fab.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+  nav.appendChild(fab);
+  // Second + third nav items (if any)
+  m.nav.slice(1).forEach(item => nav.appendChild(navButton(item)));
+}
+function navButton(item) {
+  const btn = el('button', { class: 'nav-btn', 'data-nav': item.name },
+    el('span', { class: 'nav-icon', html: item.icon }),
+    el('span', {}, item.label),
+  );
+  return btn;
+}
 
 // ─── Utilities ──────────────────────────────────────────────────────
 const $  = (sel, root = document) => root.querySelector(sel);
@@ -64,12 +138,20 @@ function render() {
   screen.innerHTML = '<div class="loading">Loading…</div>';
 
   $$('.nav-btn[data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
-  $('.back-btn').hidden = (name === 'grid' && State.history.length === 0);
+  $('.back-btn').hidden = (name === currentMode().home && State.history.length === 0);
 
+  // Plant mode
   if      (name === 'grid')          Screens.grid(screen);
   else if (name === 'species')       Screens.speciesDetail(screen, params.speciesId);
   else if (name === 'run')           Screens.runDetail(screen, params.runId);
   else if (name === 'reports')       Screens.reports(screen);
+  // Brew mode
+  else if (name === 'sites')         Screens.sites(screen);
+  else if (name === 'site')          Screens.siteDetail(screen, params.siteId);
+  else if (name === 'brews')         Screens.brews(screen);
+  else if (name === 'brew')          Screens.brewDetail(screen, params.brewId);
+  else if (name === 'brewstats')     Screens.brewStats(screen);
+  // Shared
   else if (name === 'settings')      Screens.settings(screen);
 }
 
@@ -80,9 +162,14 @@ document.addEventListener('click', (e) => {
   if (action) {
     const a = action.dataset.action;
     if (a === 'back') Router.back();
+    else if (a === 'toggle-mode') toggleMode();
+    else if (a === 'fab-plant') openFabSheet();
+    else if (a === 'fab-brew')  openBrewFabSheet();
     else if (a === 'add-species') openFabSheet();
     else if (a === 'add-species-direct') openAddSpeciesModal();
     else if (a === 'add-run') openAddRunModal(action.dataset.speciesId);
+    else if (a === 'add-application') openAddApplicationModal(action.dataset.siteId, action.dataset.brewId);
+    else if (a === 'add-observation') openAddObservationModal(action.dataset.siteId);
   }
 });
 
@@ -199,6 +286,44 @@ const Screens = {
   async settings(root) {
     State.config = await api.getConfig();
     renderSettings(root);
+  },
+
+  // ─── Brew Lab screens ─────────────────────────────────────────────
+  async sites(root) {
+    if (!State.config) State.config = await api.getConfig();
+    State.sites = await api.listSites();
+    renderSitesGrid(root);
+  },
+  async siteDetail(root, siteId) {
+    if (!State.config) State.config = await api.getConfig();
+    if (!State.brews.length) State.brews = await api.listBrews();
+    const [site, applications, observations] = await Promise.all([
+      api.getSite(siteId),
+      api.listApplicationsBySite(siteId),
+      api.listObservationsBySite(siteId),
+    ]);
+    if (!site) { Screens.placeholder(root, 'Not found', 'Site not found.'); return; }
+    renderSiteDetail(root, site, applications, observations);
+  },
+  async brews(root) {
+    if (!State.config) State.config = await api.getConfig();
+    State.brews = await api.listBrews();
+    renderBrewsGrid(root);
+  },
+  async brewDetail(root, brewId) {
+    if (!State.config) State.config = await api.getConfig();
+    if (!State.sites.length) State.sites = await api.listSites();
+    const [brew, applications] = await Promise.all([
+      api.getBrew(brewId),
+      api.listApplicationsByBrew(brewId),
+    ]);
+    if (!brew) { Screens.placeholder(root, 'Not found', 'Brew not found.'); return; }
+    renderBrewDetail(root, brew, applications);
+  },
+  async brewStats(root) {
+    if (!State.config) State.config = await api.getConfig();
+    const reports = await api.getBrewReports();
+    renderBrewStats(root, reports);
   },
 
   async reports(root) {
@@ -881,6 +1006,705 @@ function renderConfigSection(cat) {
   return section;
 }
 
+// ─── Brew Lab — Sites grid ────────────────────────────────────────
+function renderSitesGrid(root) {
+  root.innerHTML = '';
+  const sticky = el('div', { class: 'sticky-bar' },
+    el('div', { class: 'search' },
+      el('span', { class: 'search-icon', html: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>` }),
+      el('input', {
+        type: 'search',
+        placeholder: 'Search sites by name, owner, crop, soil…',
+        value: State.filters.search,
+        oninput: (e) => { State.filters.search = e.target.value; renderSiteCards(); }
+      })
+    ),
+    el('div', { class: 'chip-row' },
+      chip('All', !State.filters.category, () => { State.filters.category = ''; renderSitesGrid(root); }),
+      chip('Treated', State.filters.category === 'Treated', () => { State.filters.category = State.filters.category === 'Treated' ? '' : 'Treated'; renderSitesGrid(root); }),
+      chip('Control', State.filters.category === 'Control', () => { State.filters.category = State.filters.category === 'Control' ? '' : 'Control'; renderSitesGrid(root); }),
+      ...((State.config['Crops'] || []).map(c =>
+        chip(c, State.filters.category === c, () => {
+          State.filters.category = State.filters.category === c ? '' : c;
+          renderSitesGrid(root);
+        })
+      )),
+    ),
+  );
+  root.appendChild(sticky);
+  root.appendChild(el('div', { class: 'card-grid', id: 'card-grid' }));
+  renderSiteCards();
+}
+function renderSiteCards() {
+  const grid = $('#card-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const q = State.filters.search.trim().toLowerCase();
+  const filterCat = State.filters.category;
+  const filtered = State.sites.filter(s => {
+    if (filterCat === 'Treated' || filterCat === 'Control') {
+      if (s['Site Type'] !== filterCat) return false;
+    } else if (filterCat) {
+      if (s['Crop'] !== filterCat) return false;
+    }
+    if (!q) return true;
+    const hay = [s['Name'], s['Owner / Farm'], s['Location'], s['Crop'], s['Soil Type'], s['Site Type'], s['Baseline Notes']]
+      .filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  if (filtered.length === 0) {
+    grid.style.display = 'none';
+    grid.parentElement.appendChild(emptyState(
+      State.sites.length === 0 ? 'No sites yet' : 'Nothing matches',
+      State.sites.length === 0 ? 'Tap the + below to add your first test site.' : 'Try a different search or filter.'
+    ));
+    return;
+  }
+  grid.style.display = '';
+  filtered.forEach((s, i) => grid.appendChild(siteCard(s, i)));
+}
+function siteCard(s, idx = 0) {
+  const isControl = s['Site Type'] === 'Control';
+  const card = el('button', {
+    class: 'species-card site-card ' + (isControl ? 'cat-control' : 'cat-treated'),
+    onclick: () => Router.go('site', { siteId: s['Site ID'] }),
+  },
+    el('div', { class: 'card-banner site-banner' },
+      el('div', { html: siteIconSvg() }),
+      el('span', { class: 'site-type-badge' }, isControl ? 'CONTROL' : 'TREATED'),
+    ),
+    el('div', { class: 'card-body' },
+      el('h3', { class: 'common-name' }, s['Name'] || '(unnamed site)'),
+      el('p', { class: 'scientific-name' },
+        [s['Owner / Farm'], s['Crop']].filter(Boolean).join(' · ')),
+      el('div', { class: 'card-foot' },
+        s['Crop'] ? el('span', { class: 'cat-tag' }, s['Crop']) : el('span'),
+        s.applicationCount
+          ? el('span', { class: 'run-count' }, `${s.applicationCount} APP${s.applicationCount > 1 ? 'S' : ''}`)
+          : null,
+      ),
+    ),
+  );
+  card.style.animationDelay = `${Math.min(idx, 20) * 30}ms`;
+  return card;
+}
+function siteIconSvg() {
+  return `<svg viewBox="0 0 48 48" fill="currentColor"><path d="M24 6 L8 18 L8 42 L40 42 L40 18 Z"/><rect x="20" y="28" width="8" height="14"/></svg>`;
+}
+
+// ─── Brew Lab — Site detail ───────────────────────────────────────
+function renderSiteDetail(root, site, applications, observations) {
+  root.innerHTML = '';
+  const isControl = site['Site Type'] === 'Control';
+
+  const hero = el('div', { class: 'detail-hero ' + (isControl ? 'cat-control' : 'cat-treated') });
+  hero.style.setProperty('--tint', isControl ? '#7a5ab0' : '#2d8a3e');
+  hero.append(
+    el('div', { class: 'hero-icon', html: siteIconSvg() }),
+    el('h2', {}, site['Name'] || '(unnamed site)'),
+    site['Owner / Farm'] ? el('p', { class: 'sci' }, site['Owner / Farm']) : null,
+    el('div', { class: 'badges' },
+      el('span', { class: 'pill' }, isControl ? 'CONTROL' : 'TREATED'),
+      site['Crop']      ? el('span', { class: 'pill' }, site['Crop']) : null,
+      site['Soil Type'] ? el('span', { class: 'pill' }, site['Soil Type']) : null,
+      site['Location']  ? el('span', { class: 'pill' }, site['Location']) : null,
+    ),
+    site['Baseline Notes']
+      ? el('p', { class: 'hero-meta' }, el('strong', {}, 'Baseline: '), site['Baseline Notes'])
+      : null,
+  );
+  root.appendChild(hero);
+
+  // Applications
+  root.appendChild(el('div', { class: 'section-header' },
+    el('h3', { html: `Applications ${applications.length ? `<span class="count">${applications.length}</span>` : ''}` }),
+    el('button', { class: 'btn-add-inline', 'data-action': 'add-application', 'data-site-id': site['Site ID'] }, '＋ Apply brew'),
+  ));
+  if (applications.length === 0) {
+    root.appendChild(emptyState('No applications yet', 'Tap "Apply brew" to log the first one.'));
+  } else {
+    const grid = el('div', { class: 'run-grid' });
+    applications.forEach(a => {
+      const brew = State.brews.find(b => b['Brew ID'] === a['Brew ID']);
+      grid.appendChild(applicationCard(a, brew));
+    });
+    root.appendChild(grid);
+  }
+
+  // Observations
+  root.appendChild(el('div', { class: 'section-header' },
+    el('h3', { html: `Observations ${observations.length ? `<span class="count">${observations.length}</span>` : ''}` }),
+    el('button', { class: 'btn-add-inline', 'data-action': 'add-observation', 'data-site-id': site['Site ID'] }, '＋ Log observation'),
+  ));
+  if (observations.length === 0) {
+    root.appendChild(emptyState('No observations yet', 'Take a reading and log it — photos welcome.'));
+  } else {
+    const list = el('div', { class: 'notes-list' });
+    observations.forEach(o => list.appendChild(observationCard(o)));
+    root.appendChild(list);
+  }
+}
+
+function applicationCard(a, brew) {
+  return el('div', { class: 'run-card', style: 'cursor:default' },
+    el('div', { class: 'run-id' }, a['Application ID']),
+    el('h4', { class: 'run-method' }, brew ? brew['Name'] || brew['Brew ID'] : (a['Brew ID'] || '(unknown brew)')),
+    el('div', { class: 'run-meta' },
+      a['Method'] ? el('span', { class: 'tag' }, a['Method']) : null,
+      a['Date Applied'] ? el('span', { class: 'tag' }, fmtDate(a['Date Applied'])) : null,
+      a['Volume Applied (L)'] ? el('span', { class: 'tag' }, a['Volume Applied (L)'] + ' L') : null,
+      a['Dilution'] ? el('span', { class: 'tag' }, a['Dilution']) : null,
+    ),
+    a['Notes'] ? el('p', { class: 'note-body', style: 'margin-top:6px;font-size:12px' }, a['Notes']) : null,
+  );
+}
+function observationCard(o) {
+  const photos = parsePhotoUrls(o['Photo URLs']);
+  return el('div', { class: 'note observation' },
+    el('div', { class: 'note-date' },
+      [fmtDate(o['Date']), o['Days Since Application'] ? `Day ${o['Days Since Application']}` : null]
+        .filter(Boolean).join(' · ')),
+    o['Plant Health 1-10']
+      ? el('div', { class: 'health-bar' },
+          el('span', {}, 'Plant health'),
+          el('div', { class: 'health-meter' },
+            el('div', { class: 'health-fill', style: `width:${(Number(o['Plant Health 1-10']) || 0) * 10}%` })
+          ),
+          el('strong', {}, o['Plant Health 1-10'] + '/10'),
+        )
+      : null,
+    o['Growth']            ? el('p', { class: 'note-body' }, el('strong', {}, 'Growth: '), o['Growth']) : null,
+    o['Disease Incidence'] ? el('p', { class: 'note-body' }, el('strong', {}, 'Disease: '), o['Disease Incidence']) : null,
+    o['Yield']             ? el('p', { class: 'note-body' }, el('strong', {}, 'Yield: '), o['Yield']) : null,
+    o['Notes']             ? el('p', { class: 'note-body' }, o['Notes']) : null,
+    photos.length
+      ? el('div', { class: 'photo-strip' },
+          ...photos.map(url =>
+            el('a', { href: url, target: '_blank', rel: 'noopener' },
+              el('img', { src: url, alt: 'observation photo', loading: 'lazy' })
+            )
+          )
+        )
+      : null,
+  );
+}
+function parsePhotoUrls(s) {
+  if (!s) return [];
+  return String(s).split(/[;\n]/).map(x => x.trim()).filter(Boolean);
+}
+
+// ─── Brew Lab — Brews grid + detail ───────────────────────────────
+function renderBrewsGrid(root) {
+  root.innerHTML = '';
+  const sticky = el('div', { class: 'sticky-bar' },
+    el('div', { class: 'search' },
+      el('span', { class: 'search-icon', html: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>` }),
+      el('input', {
+        type: 'search',
+        placeholder: 'Search brews by name, status, ingredient…',
+        value: State.filters.search,
+        oninput: (e) => { State.filters.search = e.target.value; renderBrewCards(); }
+      })
+    ),
+    el('div', { class: 'chip-row' },
+      chip('All', !State.filters.category, () => { State.filters.category = ''; renderBrewsGrid(root); }),
+      ...(State.config['Brew Statuses'] || []).map(s =>
+        chip(s, State.filters.category === s, () => {
+          State.filters.category = State.filters.category === s ? '' : s;
+          renderBrewsGrid(root);
+        })
+      ),
+    ),
+  );
+  root.appendChild(sticky);
+  root.appendChild(el('div', { class: 'card-grid', id: 'card-grid' }));
+  renderBrewCards();
+}
+function renderBrewCards() {
+  const grid = $('#card-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const q = State.filters.search.trim().toLowerCase();
+  const cat = State.filters.category;
+  const filtered = State.brews.filter(b => {
+    if (cat && b['Status'] !== cat) return false;
+    if (!q) return true;
+    const hay = [b['Name'], b['Status'], b['Worm Cast Source'], b['Manure Type'], b['Manure State'], b['Fish Water Source'], b['Other Additives'], b['Notes']]
+      .filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  if (filtered.length === 0) {
+    grid.style.display = 'none';
+    grid.parentElement.appendChild(emptyState(
+      State.brews.length === 0 ? 'No brews yet' : 'Nothing matches',
+      State.brews.length === 0 ? 'Tap the + below to log your first brew.' : 'Try a different search or filter.'
+    ));
+    return;
+  }
+  grid.style.display = '';
+  filtered.forEach((b, i) => grid.appendChild(brewCard(b, i)));
+}
+function brewCard(b, idx = 0) {
+  const status = (b['Status'] || '').toLowerCase().replace(/\s+/g, '');
+  const card = el('button', {
+    class: 'species-card brew-card status-' + status,
+    onclick: () => Router.go('brew', { brewId: b['Brew ID'] }),
+  },
+    el('div', { class: 'card-banner brew-banner' },
+      el('div', { html: brewIconSvg() }),
+    ),
+    el('div', { class: 'card-body' },
+      el('h3', { class: 'common-name' }, b['Name'] || b['Brew ID']),
+      el('p', { class: 'scientific-name' }, b['Date Brewed'] ? fmtDate(b['Date Brewed']) : 'No date'),
+      el('div', { class: 'card-foot' },
+        b['Status'] ? el('span', { class: 'cat-tag' }, b['Status']) : el('span'),
+        b.applicationCount
+          ? el('span', { class: 'run-count' }, `${b.applicationCount} APP${b.applicationCount > 1 ? 'S' : ''}`)
+          : null,
+      ),
+    ),
+  );
+  card.style.animationDelay = `${Math.min(idx, 20) * 30}ms`;
+  return card;
+}
+function brewIconSvg() {
+  return `<svg viewBox="0 0 48 48" fill="currentColor"><path d="M14 12h20l-2 28H16z"/><rect x="18" y="6" width="12" height="8" rx="2"/><path d="M16 22c4 2 8-2 12 0s8-2 12 0" stroke="rgba(0,0,0,0.2)" stroke-width="1.5" fill="none"/></svg>`;
+}
+
+function renderBrewDetail(root, brew, applications) {
+  root.innerHTML = '';
+  const tint = '#a85a3a';
+  const hero = el('div', { class: 'detail-hero' });
+  hero.style.setProperty('--tint', tint);
+  hero.append(
+    el('div', { class: 'hero-icon', html: brewIconSvg() }),
+    el('h2', {}, brew['Name'] || brew['Brew ID']),
+    el('p', { class: 'sci' }, brew['Brew ID'] + (brew['Date Brewed'] ? ' · ' + fmtDate(brew['Date Brewed']) : '')),
+    el('div', { class: 'badges' },
+      brew['Status']        ? el('span', { class: 'pill' }, brew['Status']) : null,
+      brew['Manure Type']   ? el('span', { class: 'pill' }, brew['Manure Type'] + (brew['Manure State'] ? ' (' + brew['Manure State'] + ')' : '')) : null,
+      brew['Storage Days']  ? el('span', { class: 'pill' }, brew['Storage Days'] + 'd storage') : null,
+    ),
+  );
+  root.appendChild(hero);
+
+  // Recipe panel — editable
+  const recipe = el('div', { class: 'run-detail' },
+    el('h3', { style: 'margin:0 0 8px;font-family:var(--display)' }, 'Recipe & batch'),
+    safetyBanners(brew),
+  );
+
+  const fields = [
+    { key: 'Name',                type: 'text' },
+    { key: 'Date Brewed',         type: 'date' },
+    { key: 'Status',              type: 'select', config: 'Brew Statuses' },
+    { key: 'Worm Cast Source',    type: 'text' },
+    { key: 'Worm Cast Amount',    type: 'text', placeholder: 'e.g. 2 cups' },
+    { key: 'Manure Type',         type: 'select', config: 'Manure Types' },
+    { key: 'Manure State',        type: 'select', config: 'Manure States' },
+    { key: 'Manure Amount',       type: 'text', placeholder: 'e.g. 1 cup' },
+    { key: 'Fish Water Source',   type: 'text', placeholder: 'e.g. tank A' },
+    { key: 'Fish Water Amount',   type: 'text', placeholder: 'e.g. 10 L' },
+    { key: 'Molasses % v/v',      type: 'number', step: '0.01', placeholder: '0.2 max' },
+    { key: 'Aeration Hours',      type: 'number' },
+    { key: 'Storage Days',        type: 'number' },
+    { key: 'DO mg/L',             type: 'number', step: '0.1' },
+    { key: 'pH',                  type: 'number', step: '0.1' },
+    { key: 'Use-By Date',         type: 'date' },
+  ];
+  const inputs = {};
+  const grid = el('div', { class: 'field-grid' });
+  fields.forEach(f => {
+    let input;
+    if (f.type === 'select') {
+      input = el('select', { name: f.key },
+        el('option', { value: '' }, '—'),
+        ...(State.config[f.config] || []).map(v =>
+          el('option', { value: v, selected: brew[f.key] === v ? '' : null }, v)
+        )
+      );
+    } else if (f.type === 'date') {
+      const d = brew[f.key] ? new Date(brew[f.key]) : null;
+      const v = d && !isNaN(d) ? d.toISOString().slice(0, 10) : '';
+      input = el('input', { type: 'date', name: f.key, value: v });
+    } else {
+      const attrs = { type: f.type, name: f.key, value: brew[f.key] || '' };
+      if (f.step) attrs.step = f.step;
+      if (f.placeholder) attrs.placeholder = f.placeholder;
+      input = el('input', attrs);
+    }
+    inputs[f.key] = input;
+    grid.appendChild(el('div', { class: 'field' }, el('label', {}, f.key), input));
+  });
+  const additives = el('input', { type: 'text', name: 'Other Additives', value: brew['Other Additives'] || '' });
+  const smell    = el('input', { type: 'text', name: 'Smell / Colour', value: brew['Smell / Colour'] || '' });
+  const notes    = el('textarea', { name: 'Notes' }, brew['Notes'] || '');
+  inputs['Other Additives'] = additives;
+  inputs['Smell / Colour']  = smell;
+  inputs['Notes'] = notes;
+
+  recipe.appendChild(grid);
+  recipe.appendChild(el('div', { class: 'field' }, el('label', {}, 'Other additives'), additives));
+  recipe.appendChild(el('div', { class: 'field' }, el('label', {}, 'Smell / colour'), smell));
+  recipe.appendChild(el('div', { class: 'field' }, el('label', {}, 'Notes'), notes));
+
+  recipe.appendChild(el('div', { class: 'run-action-row' },
+    el('button', { class: 'btn-primary', onclick: async () => {
+      const data = {};
+      Object.keys(inputs).forEach(k => { data[k] = inputs[k].value; });
+      try {
+        await api.updateBrew(brew['Brew ID'], data);
+        toast('Saved');
+        Router.go('brew', { brewId: brew['Brew ID'] }, { push: false });
+      } catch (err) { toast('Error: ' + err.message); }
+    }}, 'Save changes'),
+  ));
+  root.appendChild(recipe);
+
+  // Application history
+  root.appendChild(el('div', { class: 'section-header' },
+    el('h3', { html: `Applied to ${applications.length ? `<span class="count">${applications.length}</span>` : ''}` }),
+  ));
+  if (applications.length === 0) {
+    root.appendChild(emptyState('Not yet applied', 'Open a site and tap "Apply brew" to start.'));
+  } else {
+    const grid = el('div', { class: 'run-grid' });
+    applications.forEach(a => {
+      const site = State.sites.find(s => s['Site ID'] === a['Site ID']);
+      grid.appendChild(el('button', {
+        class: 'run-card',
+        onclick: () => site ? Router.go('site', { siteId: site['Site ID'] }) : null,
+      },
+        el('div', { class: 'run-id' }, a['Application ID']),
+        el('h4', { class: 'run-method' }, site ? site['Name'] : a['Site ID']),
+        el('div', { class: 'run-meta' },
+          a['Method']         ? el('span', { class: 'tag' }, a['Method']) : null,
+          a['Date Applied']   ? el('span', { class: 'tag' }, fmtDate(a['Date Applied'])) : null,
+          site && site['Site Type'] ? el('span', { class: 'tag' }, site['Site Type']) : null,
+        ),
+      ));
+    });
+    root.appendChild(grid);
+  }
+}
+
+function safetyBanners(brew) {
+  const warnings = [];
+  const mol = parseFloat(brew['Molasses % v/v']);
+  if (!isNaN(mol) && mol > 0.2) warnings.push(`Molasses ${mol}% — above the 0.2% pathogen-regrowth threshold. Add microbial testing or reduce.`);
+  const doVal = parseFloat(brew['DO mg/L']);
+  if (!isNaN(doVal) && doVal < 6) warnings.push(`DO ${doVal} mg/L — below the 6 mg/L target for aerobic brewing.`);
+  const storage = parseFloat(brew['Storage Days']);
+  if (!isNaN(storage) && storage > 7) warnings.push(`Storage ${storage} days — biology has likely shifted anaerobic; treat as a different product to what was brewed.`);
+  if (brew['Manure State'] === 'Fresh') warnings.push(`Fresh manure — increased pathogen / weed-seed risk. Avoid edible-crop sites without composting first.`);
+  if (warnings.length === 0) return null;
+  return el('div', { class: 'safety-banners' },
+    ...warnings.map(w => el('div', { class: 'safety-banner' },
+      el('span', { class: 'sb-icon' }, '⚠'),
+      el('span', {}, w),
+    ))
+  );
+}
+
+// ─── Brew Lab — Stats ─────────────────────────────────────────────
+function renderBrewStats(root, reports) {
+  root.innerHTML = '';
+  root.appendChild(el('div', { class: 'settings-intro' },
+    el('h2', { class: 'settings-title' }, 'Brew Lab Stats'),
+    el('p', { class: 'settings-blurb' }, 'Quick rollup of how the trial is going. More breakdowns will appear as observations build up.'),
+  ));
+
+  root.appendChild(el('div', { class: 'stat-strip' },
+    statTile(reports.totals.sites, 'Sites', 'sun'),
+    statTile(reports.totals.brews, 'Brews', 'cool'),
+    statTile(reports.totals.applications, 'Applications', 'alt'),
+  ));
+  root.appendChild(el('div', { class: 'stat-strip', style: 'grid-template-columns:1fr' },
+    statTile(reports.totals.observations, 'Observations logged', '')
+  ));
+
+  // Treated vs control
+  const tvc = reports.treatedVsControl || { treated: {}, control: {} };
+  const section = el('section', { class: 'config-section' },
+    el('div', { class: 'config-section-head' },
+      el('h3', {}, 'Treated vs Control'),
+      el('p', { class: 'config-hint' }, 'Average plant health on the most recent observation per site, by site type.'),
+    ),
+    el('div', { class: 'tvc-grid' },
+      el('div', { class: 'tvc-card treated' },
+        el('div', { class: 'tvc-label' }, 'Treated'),
+        el('div', { class: 'tvc-value' }, tvc.treated.avgHealth != null ? tvc.treated.avgHealth + '/10' : '—'),
+        el('div', { class: 'tvc-meta' }, (tvc.treated.count || 0) + ' sites'),
+      ),
+      el('div', { class: 'tvc-card control' },
+        el('div', { class: 'tvc-label' }, 'Control'),
+        el('div', { class: 'tvc-value' }, tvc.control.avgHealth != null ? tvc.control.avgHealth + '/10' : '—'),
+        el('div', { class: 'tvc-meta' }, (tvc.control.count || 0) + ' sites'),
+      ),
+    ),
+  );
+  root.appendChild(section);
+
+  if (reports.expiringBrews && reports.expiringBrews.length) {
+    const exp = el('section', { class: 'config-section attention-section' },
+      el('div', { class: 'config-section-head' },
+        el('h3', { html: `Brews past use-by <span class="count-pill">${reports.expiringBrews.length}</span>` }),
+        el('p', { class: 'config-hint' }, 'Tap to mark expired or archive.'),
+      ),
+      el('div', { class: 'attention-list' },
+        ...reports.expiringBrews.map(b => el('button', {
+          class: 'attention-row',
+          onclick: () => Router.go('brew', { brewId: b['Brew ID'] }),
+        },
+          el('div', { class: 'run-id' }, b['Brew ID']),
+          el('div', { class: 'attention-name' }, b['Name'] || '(unnamed brew)'),
+          el('div', { class: 'run-meta' },
+            b['Status'] ? el('span', { class: 'tag' }, b['Status']) : null,
+            b['Use-By Date'] ? el('span', { class: 'tag' }, 'Use-by ' + fmtDate(b['Use-By Date'])) : null,
+          ),
+        ))
+      )
+    );
+    root.appendChild(exp);
+  }
+}
+
+// ─── Brew Lab — FAB action sheet ──────────────────────────────────
+function openBrewFabSheet() {
+  const { name, params } = State.current;
+  const actions = [];
+
+  actions.push({
+    label: 'Add new site', sub: 'Where you’re testing brews',
+    icon: '🏡', cls: '',
+    onClick: () => openAddSiteModal(),
+  });
+  actions.push({
+    label: 'Log new brew', sub: 'Recipe + batch info',
+    icon: '🫙', cls: 'alt',
+    onClick: () => openAddBrewModal(),
+  });
+
+  if (name === 'site' && params.siteId) {
+    actions.unshift({
+      label: 'Log observation', sub: 'Plant health + photos',
+      icon: '✎', cls: 'cool',
+      onClick: () => openAddObservationModal(params.siteId),
+    });
+    actions.unshift({
+      label: 'Apply brew', sub: 'Record an application on this site',
+      icon: '💧', cls: 'alt',
+      onClick: () => openAddApplicationModal(params.siteId, null),
+    });
+  }
+  if (name === 'brew' && params.brewId) {
+    actions.unshift({
+      label: 'Apply brew to site', sub: 'Pick a site and record application',
+      icon: '💧', cls: 'alt',
+      onClick: () => openAddApplicationModal(null, params.brewId),
+    });
+  }
+
+  showActionSheet(actions);
+}
+
+// ─── Brew Lab — Modals ────────────────────────────────────────────
+function openAddSiteModal() {
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    field('Site name', el('input', { name: 'Name', required: true, autofocus: true, autocomplete: 'off', placeholder: 'e.g. Harvey’s back paddock' })),
+    field('Owner / farm', el('input', { name: 'Owner / Farm', placeholder: 'Whose farm is it?', autocomplete: 'off' })),
+    field('Location', el('input', { name: 'Location', placeholder: 'Town / GPS / paddock id', autocomplete: 'off' })),
+    field('Crop', selectFromConfig('Crop', 'Crops')),
+    field('Soil type', selectFromConfig('Soil Type', 'Soil Types')),
+    field('Site type', selectFromConfig('Site Type', 'Site Types')),
+    field('Baseline notes', el('textarea', { name: 'Baseline Notes', placeholder: 'Soil tests, prior treatments, what you’re measuring against…' })),
+  );
+  openModal('Add new site', form, async (close) => {
+    const data = {};
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    if (!data['Name']) { toast('Name required'); return; }
+    try {
+      const created = await api.createSite(data);
+      State.sites.unshift(Object.assign({}, created, { applicationCount: 0, observationCount: 0 }));
+      toast(`Added ${created['Name']}`);
+      close();
+      Router.go('site', { siteId: created['Site ID'] });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+function openAddBrewModal() {
+  const today = new Date().toISOString().slice(0, 10);
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    field('Brew name', el('input', { name: 'Name', required: true, autofocus: true, autocomplete: 'off', placeholder: 'e.g. Brew 01 — molasses-free' })),
+    field('Date brewed', el('input', { type: 'date', name: 'Date Brewed', value: today })),
+    field('Worm cast source', el('input', { name: 'Worm Cast Source', placeholder: 'e.g. Jake’s home worms' })),
+    field('Worm cast amount', el('input', { name: 'Worm Cast Amount', placeholder: 'e.g. 2 cups' })),
+    field('Manure type', selectFromConfig('Manure Type', 'Manure Types')),
+    field('Manure state', selectFromConfig('Manure State', 'Manure States')),
+    field('Manure amount', el('input', { name: 'Manure Amount', placeholder: 'e.g. 1 cup' })),
+    field('Fish water source', el('input', { name: 'Fish Water Source', placeholder: 'e.g. aquarium A' })),
+    field('Fish water amount', el('input', { name: 'Fish Water Amount', placeholder: 'e.g. 10 L' })),
+    field('Molasses % v/v (≤ 0.2 ideal)', el('input', { type: 'number', step: '0.01', name: 'Molasses % v/v', placeholder: '0 for none' })),
+    field('Aeration hours', el('input', { type: 'number', name: 'Aeration Hours', placeholder: '24 typical' })),
+    field('Storage days before use', el('input', { type: 'number', name: 'Storage Days', placeholder: '0 = use straight away' })),
+    field('Notes', el('textarea', { name: 'Notes', placeholder: 'Anything worth remembering for next batch…' })),
+  );
+  openModal('Log new brew', form, async (close) => {
+    const data = { 'Status': 'Brewing' };
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    if (!data['Name']) { toast('Name required'); return; }
+    try {
+      const created = await api.createBrew(data);
+      State.brews.unshift(Object.assign({}, created, { applicationCount: 0 }));
+      toast(`Logged ${created['Brew ID']}`);
+      close();
+      Router.go('brew', { brewId: created['Brew ID'] });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+function openAddApplicationModal(siteId, brewId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const siteField = siteId ? null : field('Site',
+    el('select', { name: 'Site ID', required: true },
+      el('option', { value: '' }, 'Pick a site…'),
+      ...State.sites.slice().sort((a, b) => (a['Name'] || '').localeCompare(b['Name'] || ''))
+        .map(s => el('option', { value: s['Site ID'] }, `${s['Name'] || s['Site ID']}${s['Site Type'] ? ' · ' + s['Site Type'] : ''}`))
+    )
+  );
+  const brewField = brewId ? null : field('Brew',
+    el('select', { name: 'Brew ID', required: true },
+      el('option', { value: '' }, 'Pick a brew…'),
+      ...State.brews.slice().sort((a, b) => (a['Name'] || '').localeCompare(b['Name'] || ''))
+        .map(b => el('option', { value: b['Brew ID'] }, `${b['Name'] || b['Brew ID']}${b['Status'] ? ' · ' + b['Status'] : ''}`))
+    )
+  );
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    siteField,
+    brewField,
+    field('Method', selectFromConfig('Method', 'Application Methods')),
+    field('Date applied', el('input', { type: 'date', name: 'Date Applied', value: today })),
+    field('Dilution', el('input', { name: 'Dilution', placeholder: 'e.g. 1:10' })),
+    field('Volume applied (L)', el('input', { type: 'number', step: '0.1', name: 'Volume Applied (L)' })),
+    field('Area treated (m²)', el('input', { type: 'number', step: '0.1', name: 'Area Treated (m²)' })),
+    field('Weather', el('input', { name: 'Weather', placeholder: 'Sunny / overcast / mm rain etc.' })),
+    field('Notes', el('textarea', { name: 'Notes', placeholder: 'Anything worth knowing about the application' })),
+  );
+  openModal('Apply brew', form, async (close) => {
+    const data = {};
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    if (siteId) data['Site ID'] = siteId;
+    if (brewId) data['Brew ID'] = brewId;
+    if (!data['Site ID']) { toast('Pick a site'); return; }
+    if (!data['Brew ID']) { toast('Pick a brew'); return; }
+    try {
+      const created = await api.createApplication(data);
+      toast(`Logged ${created['Application ID']}`);
+      close();
+      // Refresh whichever screen we came from
+      if (State.current.name === 'site') Router.go('site', { siteId: data['Site ID'] }, { push: false });
+      else if (State.current.name === 'brew') Router.go('brew', { brewId: data['Brew ID'] }, { push: false });
+      else Router.go('site', { siteId: data['Site ID'] });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+function openAddObservationModal(siteId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const photoState = { urls: [] };
+
+  const photoInput = el('input', {
+    type: 'file', accept: 'image/*', capture: 'environment', multiple: true,
+    style: 'display:none',
+    onchange: async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      uploadingMsg.style.display = '';
+      for (const file of files) {
+        try {
+          const resized = await resizeImage(file, 1280);
+          const result = await api.uploadBrewPhoto({
+            filename: file.name,
+            base64: resized.base64,
+            mimeType: 'image/jpeg',
+            siteId,
+          });
+          photoState.urls.push(result.url);
+          photoStrip.appendChild(el('div', { class: 'photo-thumb' },
+            el('img', { src: result.url }),
+          ));
+          toast('Photo uploaded');
+        } catch (err) { toast('Photo error: ' + err.message); }
+      }
+      uploadingMsg.style.display = 'none';
+      e.target.value = '';
+    },
+  });
+  const photoStrip = el('div', { class: 'photo-strip' });
+  const uploadingMsg = el('div', { class: 'photo-uploading', style: 'display:none' }, 'Uploading…');
+
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    field('Date', el('input', { type: 'date', name: 'Date', value: today })),
+    field('Days since last application', el('input', { type: 'number', name: 'Days Since Application', placeholder: 'optional' })),
+    field('Plant health 1–10', el('input', { type: 'number', min: '1', max: '10', name: 'Plant Health 1-10', placeholder: '1 = poor, 10 = thriving' })),
+    field('Growth notes', el('input', { name: 'Growth', placeholder: 'Height, vigour, leaf colour…' })),
+    field('Disease incidence', el('input', { name: 'Disease Incidence', placeholder: 'Any disease/pest signs?' })),
+    field('Yield', el('input', { name: 'Yield', placeholder: 'If harvested — kg, count, etc.' })),
+    field('Soil mineral N (if measured)', el('input', { name: 'Soil Mineral N' })),
+    field('Soil available P (if measured)', el('input', { name: 'Soil Available P' })),
+    field('Soil microbial (if measured)', el('input', { name: 'Soil Microbial' })),
+    field('Notes', el('textarea', { name: 'Notes' })),
+    el('div', { class: 'field' },
+      el('label', {}, 'Photos'),
+      el('button', {
+        type: 'button',
+        class: 'btn',
+        onclick: () => photoInput.click(),
+      }, '📷 Take or pick photos'),
+      uploadingMsg,
+      photoStrip,
+      photoInput,
+    ),
+  );
+
+  openModal('Log observation', form, async (close) => {
+    const data = { 'Site ID': siteId };
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    if (photoState.urls.length) data['Photo URLs'] = photoState.urls.join(';');
+    try {
+      const created = await api.createObservation(data);
+      toast(`Logged ${created['Observation ID']}`);
+      close();
+      Router.go('site', { siteId }, { push: false });
+    } catch (err) { toast('Error: ' + err.message); }
+  });
+}
+
+// Resize an image File client-side and return base64 (no data URI prefix).
+function resizeImage(file, maxDim) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const base64 = dataUrl.split(',')[1];
+      resolve({ base64, width: w, height: h });
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   if (window.API_CONFIG && window.API_CONFIG.USE_MOCK) {
@@ -889,5 +1713,6 @@ window.addEventListener('DOMContentLoaded', () => {
       document.body.firstChild
     );
   }
-  Router.go('grid', {}, { push: false });
+  applyMode();
+  Router.go(currentMode().home, {}, { push: false });
 });

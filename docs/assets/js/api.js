@@ -148,6 +148,27 @@ window.api = {
     }
     return call('getReports');
   },
+  // ─── Brew Lab ──────────────────────────────────────────────────────
+  async listBrews()                       { return mockArray('MOCK_BREWS') ?? call('listBrews'); },
+  async getBrew(brewId)                   { return call('getBrew', { brewId }); },
+  async createBrew(data)                  { return call('createBrew', data); },
+  async updateBrew(brewId, data)          { return call('updateBrew', { brewId, data }); },
+
+  async listSites()                       { return mockArray('MOCK_SITES') ?? call('listSites'); },
+  async getSite(siteId)                   { return call('getSite', { siteId }); },
+  async createSite(data)                  { return call('createSite', data); },
+  async updateSite(siteId, data)          { return call('updateSite', { siteId, data }); },
+
+  async listApplicationsBySite(siteId)    { return call('listApplicationsBySite', { siteId }); },
+  async listApplicationsByBrew(brewId)    { return call('listApplicationsByBrew', { brewId }); },
+  async createApplication(data)           { return call('createApplication', data); },
+
+  async listObservationsBySite(siteId)    { return call('listObservationsBySite', { siteId }); },
+  async createObservation(data)           { return call('createObservation', data); },
+
+  async uploadBrewPhoto(payload)          { return call('uploadBrewPhoto', payload); },
+  async getBrewReports()                  { return call('getBrewReports'); },
+
   async addNote(linkedType, linkedId, text) {
     if (API_CONFIG.USE_MOCK) {
       const key = linkedType + ':' + linkedId;
@@ -161,6 +182,10 @@ window.api = {
 };
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function mockArray(globalKey) {
+  if (!API_CONFIG.USE_MOCK) return null;
+  return clone(window[globalKey] || []);
+}
 function byCreatedDesc(a, b) {
   const ad = a._created || a['Created Date'] || 0;
   const bd = b._created || b['Created Date'] || 0;

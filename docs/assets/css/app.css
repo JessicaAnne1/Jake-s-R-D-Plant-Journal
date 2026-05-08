@@ -1182,6 +1182,148 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 
+/* ─── Brew Lab — additional palette + components ────────────────────── */
+body[data-mode="brew"] .brand-sub { background: var(--terra); color: #fff; }
+
+.species-card.cat-treated { --tint: #2d8a3e; }
+.species-card.cat-control { --tint: #7a5ab0; }
+.detail-hero.cat-treated  { --tint: #2d8a3e; }
+.detail-hero.cat-control  { --tint: #7a5ab0; }
+
+.site-banner { position: relative; }
+.site-type-badge {
+  position: absolute;
+  top: 4px; right: 6px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  background: rgba(255,255,255,0.95);
+  color: var(--ink);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+}
+
+.brew-card { --tint: var(--terra); }
+.brew-card.status-brewing  { --tint: var(--sun); }
+.brew-card.status-ready    { --tint: var(--c-herb); }
+.brew-card.status-inuse    { --tint: var(--sky); }
+.brew-card.status-expired  { --tint: #777; }
+.brew-card.status-archived { --tint: #999; }
+
+/* Safety banners on brew detail */
+.safety-banners {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 14px;
+}
+.safety-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: #fff5db;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 2px 0 var(--ink);
+}
+.safety-banner .sb-icon {
+  background: var(--terra);
+  color: #fff;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1.5px solid var(--ink);
+}
+
+/* Plant-health bar inside an observation */
+.health-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0 8px;
+  font-size: 12px;
+}
+.health-meter {
+  background: var(--bg);
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+}
+.health-fill {
+  background: var(--c-herb);
+  height: 100%;
+  transition: width 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Photo strips */
+.photo-strip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.photo-strip img,
+.photo-thumb img {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  display: block;
+  box-shadow: 0 2px 0 var(--ink);
+}
+.photo-thumb { display: inline-block; }
+.photo-uploading {
+  font-family: var(--display);
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 6px;
+}
+
+/* Treated vs Control summary */
+.tvc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.tvc-card {
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.tvc-card.treated { background: var(--c-herb); color: #fff; }
+.tvc-card.control { background: #d3c7ea; color: var(--ink); }
+.tvc-label {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+.tvc-value {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+}
+.tvc-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.observation { background: var(--surface); }
+
 /* ─── Loading ────────────────────────────────────────────────────────── */
 .loading {
   text-align: center;

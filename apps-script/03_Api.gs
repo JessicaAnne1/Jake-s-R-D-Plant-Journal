@@ -34,6 +34,27 @@ const API_ROUTES = {
   addNote:            (p) => addNote(p.linkedType, p.linkedId, p.text),
 
   getReports:         () => getReports(),
+
+  // Brew Lab
+  listBrews:                () => listBrews(),
+  getBrew:                  (p) => getBrew(p.brewId),
+  createBrew:               (p) => createBrew(p),
+  updateBrew:               (p) => updateBrew(p.brewId, p.data),
+
+  listSites:                () => listSites(),
+  getSite:                  (p) => getSite(p.siteId),
+  createSite:               (p) => createSite(p),
+  updateSite:               (p) => updateSite(p.siteId, p.data),
+
+  listApplicationsBySite:   (p) => listApplicationsBySite(p.siteId),
+  listApplicationsByBrew:   (p) => listApplicationsByBrew(p.brewId),
+  createApplication:        (p) => createApplication(p),
+
+  listObservationsBySite:   (p) => listObservationsBySite(p.siteId),
+  createObservation:        (p) => createObservation(p),
+
+  uploadBrewPhoto:          (p) => uploadBrewPhoto(p),
+  getBrewReports:           () => getBrewReports(),
 };
 
 function doPost(e) {
